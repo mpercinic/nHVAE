@@ -51,7 +51,10 @@ class Encoder(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super(Encoder, self).__init__()
         self.hidden_size = hidden_size
-        self.gru = GRU221(input_size=input_size, hidden_size=hidden_size)
+        #self.gru = GRU221(input_size=input_size, hidden_size=hidden_size)
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.grus = {}
         self.mu = nn.Linear(in_features=hidden_size, out_features=output_size)
         self.logvar = nn.Linear(in_features=hidden_size, out_features=output_size)
 
@@ -69,15 +72,30 @@ class Encoder(nn.Module):
         return mu, logvar
 
     def recursive_forward(self, tree):
-        left = self.recursive_forward(tree.left) if tree.left is not None \
+        children = []
+        lengths = []
+        for t in tree.children:
+            t_i = self.recursive_forward(t) if t is not None \
+                else torch.zeros(tree.target.size(0), 1, self.hidden_size)
+            children.append(t_i)
+            lengths.append(len(t))
+
+        '''left = self.recursive_forward(tree.left) if tree.left is not None \
             else torch.zeros(tree.target.size(0), 1, self.hidden_size)
         right = self.recursive_forward(tree.right) if tree.right is not None \
-            else torch.zeros(tree.target.size(0), 1, self.hidden_size)
+            else torch.zeros(tree.target.size(0), 1, self.hidden_size)'''
 
         # left = left.mul(tree.mask[:, None, None])
         # right = right.mul(tree.mask[:, None, None])
 
-        hidden = self.gru(tree.target, left, right)
+        #hidden = self.gru(tree.target, left, right)
+        n_children = len(tree.children)
+        if n_children in self.grus:
+            gru = self.grus[n_children]
+        else:
+            gru = GRU221(input_size=self.input_size, hidden_size=self.hidden_size, n=n_children)
+            self.grus[n_children] = gru
+        hidden = gru(tree.target, children, lengths)
         hidden = hidden.mul(tree.mask[:, None, None])
         return hidden
 
@@ -88,7 +106,11 @@ class Decoder(nn.Module):
         self.hidden_size = hidden_size
         self.z2h = nn.Linear(input_size, hidden_size)
         self.h2o = nn.Linear(hidden_size, output_size)
-        self.gru = GRU122(input_size=output_size, hidden_size=hidden_size)
+        # self.gru = GRU122(input_size=output_size, hidden_size=hidden_size)
+        self.gru_ancestral = GRUAncestral(input_size=output_size, hidden_size=hidden_size)
+        self.gru_fraternal = GRUFraternal(input_size=output_size, hidden_size=hidden_size)
+        self.u_a = nn.Linear(hidden_size, hidden_size)
+        self.u_f = nn.Linear(hidden_size, hidden_size)
 
         torch.nn.init.xavier_uniform_(self.z2h.weight)
         torch.nn.init.xavier_uniform_(self.h2o.weight)
@@ -103,12 +125,24 @@ class Decoder(nn.Module):
         prediction = self.h2o(hidden)
         symbol_probs = F.softmax(prediction, dim=2)
         tree.prediction = prediction
-        if tree.left is not None or tree.right is not None:
+
+        gru_ancestral = self.gru_ancestral(symbol_probs, hidden)
+        first = True
+        for t in tree.children:
+            if t is not None:
+                if first:
+                    self.recursive_forward(gru_ancestral, t)
+                else:
+                    hidden_f = self.gru_fraternal(symbol_probs, hidden)
+                    hidden = torch.tanh(self.u_f(hidden_f) + self.u_a(hidden))
+                    self.recursive_forward(hidden_f, t)
+                first = False
+        '''if tree.left is not None or tree.right is not None:
             left, right = self.gru(symbol_probs, hidden)
             if tree.left is not None:
                 self.recursive_forward(left, tree.left)
             if tree.right is not None:
-                self.recursive_forward(right, tree.right)
+                self.recursive_forward(right, tree.right)'''
 
     # Used for inference to generate expression trees from latent vectorS
     def decode(self, z, symbol_dict):
@@ -161,14 +195,14 @@ class Decoder(nn.Module):
 
 
 class GRU221(nn.Module):
-    def __init__(self, input_size, hidden_size):
+    def __init__(self, input_size, hidden_size, n):
         super(GRU221, self).__init__()
         self.wir = nn.Linear(in_features=input_size, out_features=hidden_size)
-        self.whr = nn.Linear(in_features=2*hidden_size, out_features=hidden_size)
+        self.whr = nn.Linear(in_features=n*hidden_size, out_features=hidden_size)
         self.wiz = nn.Linear(in_features=input_size, out_features=hidden_size)
-        self.whz = nn.Linear(in_features=2 * hidden_size, out_features=hidden_size)
+        self.whz = nn.Linear(in_features=n * hidden_size, out_features=hidden_size)
         self.win = nn.Linear(in_features=input_size, out_features=hidden_size)
-        self.whn = nn.Linear(in_features=2 * hidden_size, out_features=hidden_size)
+        self.whn = nn.Linear(in_features=n * hidden_size, out_features=hidden_size)
         torch.nn.init.xavier_uniform_(self.wir.weight)
         torch.nn.init.xavier_uniform_(self.whr.weight)
         torch.nn.init.xavier_uniform_(self.wiz.weight)
@@ -176,12 +210,26 @@ class GRU221(nn.Module):
         torch.nn.init.xavier_uniform_(self.win.weight)
         torch.nn.init.xavier_uniform_(self.whn.weight)
 
-    def forward(self, x, h1, h2):
+    '''def forward(self, x, h1, h2):
         h = torch.cat([h1, h2], dim=2)
         r = torch.sigmoid(self.wir(x) + self.whr(h))
         z = torch.sigmoid(self.wiz(x) + self.whz(h))
         n = torch.tanh(self.win(x) + r * self.whn(h))
-        return (1 - z) * n + (z / 2) * h1 + (z / 2) * h2
+        return (1 - z) * n + (z / 2) * h1 + (z / 2) * h2'''
+
+    def forward(self, x, hs, ls):
+        h = torch.cat(hs, dim=2)
+        r = torch.sigmoid(self.wir(x) + self.whr(h))
+        z = torch.sigmoid(self.wiz(x) + self.whz(h))
+        n = torch.tanh(self.win(x) + r * self.whn(h))
+        l = sum(ls)
+        h_sum = (1 - z) * n
+        i = 0
+        for h_i in hs:
+            h_sum += (z * ls[i] / l) * h_i
+            i += 1
+        return h_sum
+
 
 
 class GRU122(nn.Module):
@@ -208,3 +256,51 @@ class GRU122(nn.Module):
         dh = h.repeat(1, 1, 2)
         out = (1 - z) * n + z * dh
         return torch.split(out, self.hidden_size, dim=2)
+
+class GRUAncestral(nn.Module):
+    def __init__(self, input_size, hidden_size):
+        super(GRUAncestral, self).__init__()
+        self.hidden_size = hidden_size
+        self.wir = nn.Linear(in_features=input_size, out_features=hidden_size)
+        self.whr = nn.Linear(in_features=hidden_size, out_features=hidden_size)
+        self.wiz = nn.Linear(in_features=input_size, out_features=hidden_size)
+        self.whz = nn.Linear(in_features=hidden_size, out_features=hidden_size)
+        self.win = nn.Linear(in_features=input_size, out_features=hidden_size)
+        self.whn = nn.Linear(in_features=hidden_size, out_features=hidden_size)
+        torch.nn.init.xavier_uniform_(self.wir.weight)
+        torch.nn.init.xavier_uniform_(self.whr.weight)
+        torch.nn.init.xavier_uniform_(self.wiz.weight)
+        torch.nn.init.xavier_uniform_(self.whz.weight)
+        torch.nn.init.xavier_uniform_(self.win.weight)
+        torch.nn.init.xavier_uniform_(self.whn.weight)
+
+    def forward(self, x, h):
+        r = torch.sigmoid(self.wir(x) + self.whr(h))
+        z = torch.sigmoid(self.wiz(x) + self.whz(h))
+        n = torch.tanh(self.win(x) + r * self.whn(h))
+        out = (1 - z) * n + z * h
+        return out
+
+class GRUFraternal(nn.Module):
+    def __init__(self, input_size, hidden_size):
+        super(GRUFraternal, self).__init__()
+        self.hidden_size = hidden_size
+        self.wir = nn.Linear(in_features=input_size, out_features=hidden_size)
+        self.whr = nn.Linear(in_features=hidden_size, out_features=hidden_size)
+        self.wiz = nn.Linear(in_features=input_size, out_features=hidden_size)
+        self.whz = nn.Linear(in_features=hidden_size, out_features=hidden_size)
+        self.win = nn.Linear(in_features=input_size, out_features=hidden_size)
+        self.whn = nn.Linear(in_features=hidden_size, out_features=hidden_size)
+        torch.nn.init.xavier_uniform_(self.wir.weight)
+        torch.nn.init.xavier_uniform_(self.whr.weight)
+        torch.nn.init.xavier_uniform_(self.wiz.weight)
+        torch.nn.init.xavier_uniform_(self.whz.weight)
+        torch.nn.init.xavier_uniform_(self.win.weight)
+        torch.nn.init.xavier_uniform_(self.whn.weight)
+
+    def forward(self, x, h):
+        r = torch.sigmoid(self.wir(x) + self.whr(h))
+        z = torch.sigmoid(self.wiz(x) + self.whz(h))
+        n = torch.tanh(self.win(x) + r * self.whn(h))
+        out = (1 - z) * n + z * h
+        return out
