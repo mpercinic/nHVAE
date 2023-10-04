@@ -14,16 +14,8 @@ from pymoo.termination.max_gen import MaximumGenerationTermination
 
 from symbol_library import generate_symbol_library
 from model import HVAE
-from hvae_utils import load_config_file, create_batch
+from hvae_utils import load_config_file, create_batch, tokens_to_tree
 from evaluation import RustEval
-
-# -----------------------------------------------------------------------------------------------------------------
-#
-#                           WORK IN PROGRESS, USE SR SCRIPTS FROM ProGED
-#           (https://github.com/smeznar/ProGED/blob/main/ProGED/examples/ng_bench.py)
-#                                     TO EVALUATE THE RESULTS
-#
-# -----------------------------------------------------------------------------------------------------------------
 
 
 def read_eq_data(filename):
@@ -64,11 +56,12 @@ class SRProblem(Problem):
             return self.models[expr_postfix_str]["error"]
         else:
             error, constants = self.eval_object.fit_and_evaluate(expr_postfix)
+            expr_infix = " ".join(tree.to_list())
             if error is None:
-                self.models[expr_postfix_str] = {"expr": str(tree), "error": self.default_value, "trees": 1}
+                self.models[expr_postfix_str] = {"expr": expr_infix, "error": self.default_value, "trees": 1}
                 error = self.default_value
             else:
-                self.models[expr_postfix_str] = {"expr": str(tree), "error": error, "trees": 1, "constants": constants}
+                self.models[expr_postfix_str] = {"expr": expr_infix, "error": error, "trees": 1, "constants": constants}
 
             if error < self.best_f:
                 self.best_f = error
@@ -112,46 +105,118 @@ class RandomMutation(Mutation):
         trees = problem.model.decode(torch.tensor(X[:, None, :]))
         batch = create_batch(trees)
         var = problem.model.encode(batch)[1][:, 0, :].detach().numpy()
-        mutation_scale = np.random.random((200, 1))
+        mutation_scale = np.random.random((X.shape[0], 1))
         std = np.multiply(mutation_scale, (np.exp(var/2.0)-1)) + 1
         return np.random.normal(mutation_scale * X, std).astype(np.float32)
 
 
-if __name__ == '__main__':
-    config = load_config_file("../configs/test_config.json")
-    expr_config = config["expression_definition"]
-    es_config = config["expression_set_generation"]
+def one_sr_run(config, baseline, re_train, seed):
     training_config = config["training"]
-    reconstruction_config = config["reconstruction"]
     sr_config = config["symbolic_regression"]
 
-    if training_config["seed"] is not None:
-        np.random.seed(training_config["seed"])
-        torch.manual_seed(training_config["seed"])
-        random.seed(training_config["seed"])
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    random.seed(seed)
 
-    # Read data
-    train = read_eq_data(sr_config["train_set_path"])
-    fe_train = RustEval(train)
+    if baseline == "EDHiE":
+        ga = GA(pop_size=sr_config["population_size"], sampling=TorchNormalSampling(), crossover=LICrossover(), mutation=RandomMutation(),
+                eliminate_duplicates=False)
+        problem = SRProblem(model, re_train, training_config["latent_size"], default_value=sr_config["default_error"])
+        minimize(problem, ga, BestTermination(min_f=sr_config["success_threshold"], n_max_gen=sr_config["max_generations"]), verbose=True)
+
+        best_candidates = sorted(list(problem.models.values()), key=lambda x: x['error'])
+        if sr_config["save_best_n"] > -1:
+            best_candidates = best_candidates[:sr_config["save_best_n"]]
+        return {"baseline": baseline, "train": {"best_expr": problem.best_expr, "best_error": problem.best_f},
+                "all_evaluated": len(problem.models), "all_generated": sum([m["trees"] for m in problem.models.values()]),
+                "best_candidates": best_candidates}
+
+    elif baseline == "HVAR":
+        gaussian_distribution_mean = torch.zeros(next(model.decoder.parameters()).size(0))
+        best_f = 9e+50
+        best_expr = ""
+        models = {}
+        for _ in range(sr_config["population_size"]*sr_config["max_generations"]):
+            x = torch.normal(gaussian_distribution_mean)[None, None, :]
+            tree = model.decode(x)[0]
+            expr_postfix = tree.to_list(notation="postfix")
+            expr_postfix_str = "".join(expr_postfix)
+            if expr_postfix_str in models:
+                models[expr_postfix_str]["trees"] += 1
+            else:
+                error, constants = re_train.fit_and_evaluate(expr_postfix)
+                expr_infix = " ".join(tree.to_list())
+                if error is None:
+                    models[expr_postfix_str] = {"expr": expr_infix, "error": sr_config["default_error"], "trees": 1}
+                else:
+                    models[expr_postfix_str] = {"expr": expr_infix, "error": error, "trees": 1, "constants": constants}
+                    if error < best_f:
+                        best_f = error
+                        best_expr = str(tree)
+                        print(f"New best expression: {best_expr}, with constants [{','.join([str(c) for c in constants])}]"
+                            f"\t|\tError: {best_f}")
+                    if error < sr_config["success_threshold"]:
+                        break
+
+        best_candidates = sorted(list(models.values()), key=lambda x: x['error'])
+        if sr_config["save_best_n"] > -1:
+            best_candidates = best_candidates[:sr_config["save_best_n"]]
+        return {"baseline": baseline, "train": {"best_expr": best_candidates[0]['expr'], "best_error": best_candidates[0]["error"]},
+                "all_evaluated": len(models), "all_generated": sum([m["trees"] for m in models.values()]),
+                "best_candidates": best_candidates}
+
+
+def check_on_test_set(results, re_test, so):
+    best_test_error = 9e+50
+    best_test_expression = ""
+
+    for i in range(len(results["best_candidates"])):
+        tree = tokens_to_tree(results["best_candidates"][i]["expr"].split(" "), so)
+        test_error = re_test.get_error(tree.to_list("postfix"), [results["best_candidates"][i]["constants"]])[0]
+        results["best_candidates"][i]["test_error"] = test_error
+        if test_error < best_test_error:
+            best_test_error = test_error
+            best_test_expression = str(tree)
+
+    test_best = {}
+    test_best["best_error"] = best_test_error
+    test_best["best_expr"] = best_test_expression
+    results["test"] = test_best
+    return results
+
+
+if __name__ == '__main__':
+    config = load_config_file("../configs/test_config.json")
+    sr_config = config["symbolic_regression"]
+    expr_config = config["expression_definition"]
+    training_config = config["training"]
+
+    train_set = read_eq_data(sr_config["train_set_path"])
+    re_train = RustEval(train_set, default_value=sr_config["default_error"])
 
     sy_lib = generate_symbol_library(expr_config["num_variables"], expr_config["symbols"], expr_config["has_constants"])
+    so = {s["symbol"]: s for s in sy_lib}
     HVAE.add_symbols(sy_lib)
     model = torch.load(training_config["param_path"])
 
-    if sr_config["baseline"] == "EDHiE":
-        ga = GA(pop_size=sr_config["population_size"], sampling=TorchNormalSampling(), crossover=LICrossover(), mutation=RandomMutation(),
-                eliminate_duplicates=False)
-        problem = SRProblem(model, fe_train, training_config["latent_size"])
-        res = minimize(problem, ga, BestTermination(min_f=sr_config["success_threshold"], n_max_gen=sr_config["max_generations"]), verbose=True)
-        with open(sr_config["results_path"], "w") as file:
-            json.dump({"best": problem.best_expr, "all": list(problem.models.values())}, file)
+    results = []
+    for baseline in sr_config["baselines"]:
+        for i in range(sr_config["number_of_runs"]):
+            if sr_config["seed"] is not None:
+                seed = sr_config["seed"] + i
+            else:
+                seed = np.random.randint(np.iinfo(np.int64).max)
+            print()
+            print("---------------------------------------------------------------------------")
+            print(f"     Baseline: {baseline}, Run: {i+1}/{sr_config['number_of_runs']}")
+            print("---------------------------------------------------------------------------")
+            print()
+            results.append(one_sr_run(config, baseline, re_train, seed))
 
-    # if args.baseline == "HVAE_random":
-    #     fe = FastEval(train, args.num_vars, symbols, has_const=args.has_const)
-    #     generator = GeneratorHVAE(args.params, ["X"], universal_symbols)
-    #     ed = EqDisco(data=train, variable_names=["X", 'Y'], generator=generator, sample_size=100000, verbosity=0)
-    #     ed.generate_models()
-    #     ed.fit_models()
-    #     print(len(ed.models))
-    #     print(ed.get_results())
-    #     ed.write_results(f"results/hvae_random_{args.dimension}/nguyen_{args.eq_num}_{np.random.randint(0, 1000000)}.json")
+    test_set = read_eq_data(sr_config["test_set_path"])
+    re_test = RustEval(train_set, default_value=sr_config["default_error"])
+    for i in range(len(results)):
+        results[i] = check_on_test_set(results[i], re_test, so)
+
+    with open(sr_config["results_path"], "w") as file:
+        json.dump(results, file)
