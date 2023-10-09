@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from torch.utils.data import Sampler, Dataset
 from tqdm import tqdm
+import pickle
 
 from hvae_utils import read_expressions_json, load_config_file, create_batch
 from model import HVAE
@@ -85,11 +86,16 @@ def train_hvae(model, trees, epochs=20, batch_size=32, verbose=True):
                 if verbose and i == midpoint:
                     original_trees = batch.to_expr_list()
                     z = model.encode(batch)[0]
+                    filename = "test.pkl"
+                    with open(filename, "wb") as f:
+                        pickle.dump(z, f)
                     decoded_trees = model.decode(z)
-                    for i in range(1):
-                        print()
-                        print(f"O: {original_trees[i]}")
-                        print(f"P: {decoded_trees[i]}")
+                    for i in range(len(decoded_trees)):
+                        if decoded_trees[i] is not None:
+                            print()
+                            print(original_trees[i].to_pexpr())
+                            print(f"O: {original_trees[i]}")
+                            print(f"P: {decoded_trees[i]}")
 
 
 if __name__ == '__main__':
@@ -106,12 +112,18 @@ if __name__ == '__main__':
         np.random.seed(training_config["seed"])
         torch.manual_seed(training_config["seed"])
 
-    sy_lib = generate_symbol_library(expr_config["num_variables"], expr_config["symbols"], expr_config["has_constants"])
+    sy_lib = generate_symbol_library(expr_config["num_variables"], expr_config["symbols"], expr_config["max_arity"],
+                                     expr_config["has_constants"])
+
+    print(sy_lib)
     HVAE.add_symbols(sy_lib)
 
     trees = read_expressions_json(es_config["expression_set_path"])
 
     model = HVAE(len(sy_lib), training_config["latent_size"])
+
+    '''with open("test.pkl", 'rb') as f:
+        trees_test = pickle.load(f)'''
 
     train_hvae(model, trees, training_config["epochs"], training_config["batch_size"], training_config["verbose"])
 

@@ -22,43 +22,66 @@ def tokens_to_tree(tokens, symbols):
     tokens : list of string tokens
     symbols: dictionary of possible tokens -> attributes, each token must have attributes: nargs (0-2), order
     """
+    start_expr = "".join(tokens)
     num_tokens = len([t for t in tokens if t != "(" and t != ")"])
-    expr_str = ''.join(tokens)
     tokens = ["("] + tokens + [")"]
     operator_stack = []
     out_stack = []
+    children = []
     for token in tokens:
         if token == "(":
             operator_stack.append(token)
-        elif token in symbols and symbols[token]["type"] in [SymType.Var, SymType.Const, SymType.Literal]:
-            out_stack.append(Node(token))
-        elif token in symbols and symbols[token]["type"] is SymType.Fun:
-            if symbols[token]["precedence"] <= 0:
-                out_stack.append(Node(token, left=out_stack.pop()))
+        elif token in symbols and (symbols[token]["type"].value == SymType.Var.value or symbols[token]["type"].value == SymType.Const.value) or is_float(token):
+            out_stack.append(Node(token, children=[]))
+        elif token in symbols and symbols[token]["type"].value == SymType.Fun.value:
+            if token[0] == "^":
+                # out_stack.append(Node(token, left=out_stack.pop()))
+                out_stack.append(Node(token, children=[out_stack.pop()]))
             else:
                 operator_stack.append(token)
-        elif token in symbols and symbols[token]["type"] is SymType.Operator:
+        elif token in symbols and symbols[token]["type"].value == SymType.Operator.value:
             while len(operator_stack) > 0 and operator_stack[-1] != '(' \
-                    and symbols[operator_stack[-1]]["precedence"] > symbols[token]["precedence"]:
-                if symbols[operator_stack[-1]]["type"] is SymType.Fun:
-                    out_stack.append(Node(operator_stack.pop(), left=out_stack.pop()))
+                    and (symbols[operator_stack[-1]]["precedence"] > symbols[token]["precedence"]
+                            or are_opposites(symbols[token]["symbol"], symbols[operator_stack[-1]]["symbol"])):
+                if symbols[operator_stack[-1]]["type"].value == SymType.Fun.value:
+                    # out_stack.append(Node(operator_stack.pop(), left=out_stack.pop()))
+                    out_stack.append(Node(operator_stack.pop(), children=[out_stack.pop()]))
                 else:
-                    out_stack.append(Node(operator_stack.pop(), out_stack.pop(), out_stack.pop()))
+                    op_current = operator_stack[-1]
+                    if len(operator_stack) > 1 and operator_stack[-2] == op_current:
+                        children.append(out_stack.pop())
+                        operator_stack.pop()
+                    else:
+                        children.append(out_stack.pop())
+                        children.append(out_stack.pop())
+                        children.reverse()
+                        out_stack.append(Node(operator_stack.pop(), children=children))
+                        children = []
             operator_stack.append(token)
         else:
             while len(operator_stack) > 0 and operator_stack[-1] != '(':
-                if symbols[operator_stack[-1]]["type"] is SymType.Fun:
-                    out_stack.append(Node(operator_stack.pop(), left=out_stack.pop()))
+                if symbols[operator_stack[-1]]["type"].value == SymType.Fun.value:
+                    out_stack.append(Node(operator_stack.pop(), children=[out_stack.pop()]))
+                    # out_stack.append(Node(operator_stack.pop(), left=out_stack.pop()))
                 else:
-                    out_stack.append(Node(operator_stack.pop(), out_stack.pop(), out_stack.pop()))
+                    # out_stack.append(Node(operator_stack.pop(), out_stack.pop(), out_stack.pop()))
+                    op_current = operator_stack[-1]
+                    if len(operator_stack) > 1 and operator_stack[-2] == op_current:
+                        children.append(out_stack.pop())
+                        operator_stack.pop()
+                    else:
+                        children.append(out_stack.pop())
+                        children.append(out_stack.pop())
+                        children.reverse()
+                        out_stack.append(Node(operator_stack.pop(), children=children))
+                        children = []
             operator_stack.pop()
-            if len(operator_stack) > 0 and operator_stack[-1] in symbols \
-                    and symbols[operator_stack[-1]]["type"] is SymType.Fun:
-                out_stack.append(Node(operator_stack.pop(), left=out_stack.pop()))
-    if len(out_stack[-1]) == num_tokens:
-        return out_stack[-1]
-    else:
-        raise Exception(f"Error while parsing expression {expr_str}.")
+            if len(operator_stack) > 0 and operator_stack[-1] in symbols and symbols[operator_stack[-1]]["type"].value == SymType.Fun.value:
+                out_stack.append(Node(operator_stack.pop(), children=[out_stack.pop()]))
+                # out_stack.append(Node(operator_stack.pop(), left=out_stack.pop()))
+    if len(out_stack[-1].to_list()) != num_tokens:
+        raise Exception(f"Error while parsing expression {start_expr}")
+    return out_stack[-1]
 
 
 def load_config_file(path):

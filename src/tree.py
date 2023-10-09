@@ -25,7 +25,7 @@ class Node:
         self.target = None
         self.prediction = None'''
 
-    def __init__(self, symbol=None, children=None):
+    def __init__(self, symbol=None, children=[]):
         self.symbol = symbol
         self.children = children
         self.target = None
@@ -42,7 +42,7 @@ class Node:
     def __len__(self):
         len_sum = 0
         for t in self.children:
-            len_sum += len(t) if t is not None else 0
+            len_sum += len(t)
         return 1 + len_sum
 
     '''def height(self):
@@ -53,8 +53,16 @@ class Node:
     def height(self):
         height_max = 0
         for t in self.children:
-            height_max = t.height() if t is not None else 0
+            height_max = t.height()
         return 1 + height_max
+
+    @staticmethod
+    def symbol_type(symbol):
+        return Node._symbols[Node._s2c[symbol]]["type"].value
+
+    @staticmethod
+    def symbol_precedence(symbol):
+        return Node._symbols[Node._s2c[symbol]]["precedence"]
 
     '''def to_list(self, notation="infix"):
         if notation == "infix" and Node._symbols is None:
@@ -91,20 +99,55 @@ class Node:
             raise Exception("Invalid notation selected. Use 'infix', 'prefix', 'postfix'.")'''
 
     def to_list(self, notation="infix"):
+        self.children = [t for t in self.children if t is not None]
         if notation == "infix" and Node._symbols is None:
             raise Exception("To generate a list of token in the infix notation, symbol library is needed. Please use"
                             " the Node.add_symbols methods to add them, before using the to_list method.")
         if notation == "prefix":
             expression = [self.symbol]
             for t in self.children:
-                expression += [] if t is None else t.to_list(notation)
+                expression += t.to_list(notation)
             return expression
         elif notation == "postfix":
             expression = []
             for t in self.children:
-                expression += [] if t is None else t.to_list(notation)
+                expression += t.to_list(notation)
             return expression + [self.symbol]
+
         elif notation == "infix":
+            if is_float(self.symbol):
+                return [self.symbol]
+            stype = Node.symbol_type(self.symbol)
+            if stype == SymType.Var.value or stype == SymType.Const.value:
+                return [self.symbol]
+            elif stype == SymType.Fun.value and len(self.children) == 1:
+                expression = self.children[0].to_list(notation)
+                if Node.symbol_precedence(self.symbol) > 0:
+                    return [self.symbol, "("] + expression + [")"]
+                else:
+                    if len(self.children[0]) > 1:
+                        expression = ["("] + expression + [")"]
+                    return expression + [self.symbol]
+            elif stype == SymType.Fun.value:
+                print(":" + self.symbol, self.children)
+            elif stype == SymType.Operator.value:
+                # print(self.symbol, self.children)
+                expression = []
+                first = True
+                for t in self.children:
+                    expression += [self.symbol] if not first else []
+                    first = False
+                    subexpression = t.to_list(notation)
+                    if not is_float(t.symbol) and -1 < Node.symbol_precedence(t.symbol) <= Node.symbol_precedence(self.symbol):
+                        subexpression = ["("] + subexpression + [")"]
+                    expression += subexpression
+                return expression
+            else:
+                raise Exception("Invalid symbol type")
+        else:
+            raise Exception("Invalid notation selected. Use 'infix', 'prefix', 'postfix'.")
+
+    '''elif notation == "infix":
             if len(self.children) == 1 and self.children[0] is not None and Node.symbol_precedence(self.symbol) > 0:
                 return [self.symbol] + ["("] + self.children[0].to_list(notation) + [")"]
             elif len(self.children) == 1 and self.children[0] is not None and Node.symbol_precedence(self.symbol) <= 0:
@@ -119,7 +162,7 @@ class Node:
                     expression += ["("] + t.to_list(notation) + [")"]
             return expression
         else:
-            raise Exception("Invalid notation selected. Use 'infix', 'prefix', 'postfix'.")
+            raise Exception("Invalid notation selected. Use 'infix', 'prefix', 'postfix'.")'''
 
     '''def to_pexpr(self):
         if Node._symbols is None:
@@ -130,12 +173,17 @@ class Node:
         return [Node._symbols[Node._s2c[self.symbol]]["psymbol"]] + left + right'''
 
     def to_pexpr(self):
+        self.children = [t for t in self.children if t is not None]
         if Node._symbols is None:
             raise Exception("To generate a pexpr, symbol library is needed. Please use"
                             " the Node.add_symbols methods to add them, before using the to_list method.")
         expression = [Node._symbols[Node._s2c[self.symbol]]["psymbol"]]
+        if len(self.children) != 0:
+            expression += '('
         for t in self.children:
-            expression += [] if t is None else t.to_pexpr()
+            expression += t.to_pexpr()
+        if len(self.children) != 0:
+            expression += ')'
         return expression
 
     '''def add_target_vectors(self):
@@ -158,8 +206,7 @@ class Node:
         target[Node._s2c[self.symbol]] = 1.0
         self.target = Variable(target[None, None, :])
         for t in self.children:
-            if t is not None:
-                t.add_target_vectors()
+            t.add_target_vectors()
 
     def loss(self, mu, logvar, lmbda, criterion):
         pred = Node.to_matrix(self, "prediction")
@@ -192,8 +239,7 @@ class Node:
         d = {'s': self.symbol}
         i = 1
         for t in self.children:
-            if t is not None:
-                d[i] = t.to_dict()
+            d[i] = t.to_dict()
             i += 1
         return d
 
@@ -201,11 +247,9 @@ class Node:
     def from_dict(d):
         children = []
         i = 1
-        while i in d:
-            children.append(Node.from_dict(d[i]))
+        while str(i) in d:
+            children.append(Node.from_dict(d[str(i)]))
             i += 1
-        if len(children) == 0:
-            children.append(None)
         return Node(d["s"], children=children)
 
     '''def from_dict(d):
@@ -217,13 +261,6 @@ class Node:
             right = Node.from_dict(d["r"])
         return Node(d["s"], right=right, left=left)'''
 
-    @staticmethod
-    def symbol_type(symbol):
-        return Node._symbols[Node._s2c[symbol]]["type"].value
-
-    @staticmethod
-    def symbol_precedence(symbol):
-        return Node._symbols[Node._s2c[symbol]]["precedence"]
 
     @staticmethod
     def to_matrix(tree, matrix_type="prediction"):
@@ -235,8 +272,7 @@ class Node:
             reps.append(tree.prediction[0, :, :])
 
         for t in tree.children:
-            if t is not None:
-                reps.append(Node.to_matrix(t, matrix_type))
+            reps.append(Node.to_matrix(t, matrix_type))
 
         return torch.cat(reps)
 
@@ -269,16 +305,27 @@ class BatchedNode():
         self.symbols = ["" for _ in range(size)]
         #self.left = None
         #self.right = None
-        self.children = None
+        self.children = []
 
         if trees is not None:
             for tree in trees:
                 self.add_tree(tree)
 
+
     @staticmethod
     def add_symbols(symbols):
         BatchedNode._symbols = symbols
         BatchedNode._s2c = {s["symbol"]: i for i, s in enumerate(symbols)}
+
+    def batched_len(self):
+        symbol_length = 0
+        for s in self.symbols:
+            if len(s) > 0:
+                symbol_length += 1
+        len_sum = 0.0
+        for t in self.children:
+            len_sum += t.batched_len()
+        return symbol_length / len(self.symbols) + len_sum
 
     '''def add_tree(self, tree=None):
         if tree is None:
@@ -311,14 +358,13 @@ class BatchedNode():
         if tree is None:
             self.symbols.append("")
 
-            if self.children is not None:
-                for t in self.children:
-                    t.add_tree()
+            for t in self.children:
+                t.add_tree()
         else:
             self.symbols.append(tree.symbol)
 
-            if self.children is not None and tree.children is not None:
-                s_len, t_len = len(self.children), len(tree.children)
+            s_len, t_len = len(self.children), len(tree.children)
+            if s_len > 0 and t_len > 0:
                 if s_len <= t_len:
                     for i in range(t_len):
                         if i < s_len:
@@ -333,10 +379,10 @@ class BatchedNode():
                             self.children[i].add_tree(tree.children[i])
                         else:
                             self.children[i].add_tree()
-            elif self.children is not None:
+            elif s_len > 0:
                 for t in self.children:
                     t.add_tree()
-            elif tree.children is not None:
+            elif t_len > 0:
                 self.children = []
                 for t in tree.children:
                     child = BatchedNode(size=len(self.symbols)-1)
@@ -368,8 +414,7 @@ class BatchedNode():
         self.target = Variable(target)
 
         for t in self.children:
-            if t is not None:
-                t.create_target()
+            t.create_target()
 
         '''if self.left is not None:
             self.left.create_target()
@@ -389,15 +434,17 @@ class BatchedNode():
 
         exprs = []
         for t in self.children:
-            if t is None:
-                exprs.append(None)
-            else:
-                exprs.append(t.get_expr_at_idx(idx))
+            exprs.append(t.get_expr_at_idx(idx))
 
         #left = self.left.get_expr_at_idx(idx) if self.left is not None else None
         #right = self.right.get_expr_at_idx(idx) if self.right is not None else None
 
         return Node(symbol, children=exprs)
+
+    def initialize_predictions(self, value):
+        self.prediction = value
+        for t in self.children:
+            t.initialize_predictions(value)
 
     @staticmethod
     def get_prediction(tree):
@@ -412,8 +459,7 @@ class BatchedNode():
             reps.append(BatchedNode.get_prediction(tree.right))'''
 
         for t in tree.children:
-            if t is not None:
-                reps.append(BatchedNode.get_prediction(t))
+            reps.append(BatchedNode.get_prediction(t))
 
         return torch.cat(reps, dim=1)
 
@@ -432,8 +478,7 @@ class BatchedNode():
         reps.append(target[:, None])
 
         for t in tree.children:
-            if t is not None:
-                reps.append(BatchedNode.get_target(t))
+            reps.append(BatchedNode.get_target(t))
 
         '''if tree.right is not None:
             reps.append(BatchedNode.get_target(tree.right))'''
