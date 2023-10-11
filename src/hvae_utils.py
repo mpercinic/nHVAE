@@ -2,6 +2,7 @@ import commentjson as cjson
 import json
 from symbol_library import SymType
 from tree import Node, BatchedNode
+# from expression_set_generation import are_opposites, is_float
 
 
 def read_expressions(filepath):
@@ -35,7 +36,6 @@ def tokens_to_tree(tokens, symbols):
             out_stack.append(Node(token, children=[]))
         elif token in symbols and symbols[token]["type"].value == SymType.Fun.value:
             if token[0] == "^":
-                # out_stack.append(Node(token, left=out_stack.pop()))
                 out_stack.append(Node(token, children=[out_stack.pop()]))
             else:
                 operator_stack.append(token)
@@ -44,7 +44,6 @@ def tokens_to_tree(tokens, symbols):
                     and (symbols[operator_stack[-1]]["precedence"] > symbols[token]["precedence"]
                             or are_opposites(symbols[token]["symbol"], symbols[operator_stack[-1]]["symbol"])):
                 if symbols[operator_stack[-1]]["type"].value == SymType.Fun.value:
-                    # out_stack.append(Node(operator_stack.pop(), left=out_stack.pop()))
                     out_stack.append(Node(operator_stack.pop(), children=[out_stack.pop()]))
                 else:
                     op_current = operator_stack[-1]
@@ -54,17 +53,18 @@ def tokens_to_tree(tokens, symbols):
                     else:
                         children.append(out_stack.pop())
                         children.append(out_stack.pop())
-                        children.reverse()
-                        out_stack.append(Node(operator_stack.pop(), children=children))
+                        # children.reverse()
+                        symbol = operator_stack.pop()
+                        if symbol != '^':
+                            symbol += str(len(children))
+                        out_stack.append(Node(symbol, children=children))
                         children = []
             operator_stack.append(token)
         else:
             while len(operator_stack) > 0 and operator_stack[-1] != '(':
                 if symbols[operator_stack[-1]]["type"].value == SymType.Fun.value:
                     out_stack.append(Node(operator_stack.pop(), children=[out_stack.pop()]))
-                    # out_stack.append(Node(operator_stack.pop(), left=out_stack.pop()))
                 else:
-                    # out_stack.append(Node(operator_stack.pop(), out_stack.pop(), out_stack.pop()))
                     op_current = operator_stack[-1]
                     if len(operator_stack) > 1 and operator_stack[-2] == op_current:
                         children.append(out_stack.pop())
@@ -72,13 +72,15 @@ def tokens_to_tree(tokens, symbols):
                     else:
                         children.append(out_stack.pop())
                         children.append(out_stack.pop())
-                        children.reverse()
-                        out_stack.append(Node(operator_stack.pop(), children=children))
+                        # children.reverse()
+                        symbol = operator_stack.pop()
+                        if symbol != '^':
+                            symbol += str(len(children))
+                        out_stack.append(Node(symbol, children=children))
                         children = []
             operator_stack.pop()
             if len(operator_stack) > 0 and operator_stack[-1] in symbols and symbols[operator_stack[-1]]["type"].value == SymType.Fun.value:
                 out_stack.append(Node(operator_stack.pop(), children=[out_stack.pop()]))
-                # out_stack.append(Node(operator_stack.pop(), left=out_stack.pop()))
     if len(out_stack[-1].to_list()) != num_tokens:
         raise Exception(f"Error while parsing expression {start_expr}")
     return out_stack[-1]

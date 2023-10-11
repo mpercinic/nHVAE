@@ -1,11 +1,13 @@
 {
   "expression_definition": {
+    // Functions that occur in expressions
+    "symbols": ["sin", "cos", "exp", "sqrt", "log", "^2", "^3", "^4", "^5"],
     // Operators and functions that occur in expressions
-    "symbols": ["+", "-", "*", "/", "sin", "cos", "exp", "sqrt", "log", "^2", "^3", "^4", "^5"],
+    "symbols2": ["+", "-", "*", "/", "sin", "cos", "exp", "sqrt", "log", "^2", "^3", "^4", "^5"],
     // Number of variables that occur in expressions
     "num_variables": 1,
     // Maximum arity of operators that occur in expressions
-    "max_arity": 15,
+    "max_arity": 6,
     // True if expressions also contain constant parameters, otherwise false
     "has_constants": false
   },

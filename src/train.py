@@ -112,10 +112,13 @@ if __name__ == '__main__':
         np.random.seed(training_config["seed"])
         torch.manual_seed(training_config["seed"])
 
-    sy_lib = generate_symbol_library(expr_config["num_variables"], expr_config["symbols"], expr_config["max_arity"],
-                                     expr_config["has_constants"])
+    extra_symbols = []
+    for i in range(2, expr_config["max_arity"]):
+        extra_symbols += ["+" + str(i), "-" + str(i), "*" + str(i), "/" + str(i)]
 
-    print(sy_lib)
+    sy_lib, _ = generate_symbol_library(expr_config["num_variables"], expr_config["symbols"] + extra_symbols,
+                                     expr_config["max_arity"], expr_config["has_constants"])
+
     HVAE.add_symbols(sy_lib)
 
     trees = read_expressions_json(es_config["expression_set_path"])
@@ -123,7 +126,14 @@ if __name__ == '__main__':
     model = HVAE(len(sy_lib), training_config["latent_size"])
 
     '''with open("test.pkl", 'rb') as f:
-        trees_test = pickle.load(f)'''
+        z = pickle.load(f)
+    decoded_trees = model.decode(z)
+    for i in range(len(decoded_trees)):
+        if decoded_trees[i] is not None:
+            print()
+            #print(original_trees[i].to_pexpr())
+            #print(f"O: {original_trees[i]}")
+            print(f"P: {decoded_trees[i]}")'''
 
     train_hvae(model, trees, training_config["epochs"], training_config["batch_size"], training_config["verbose"])
 
