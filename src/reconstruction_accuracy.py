@@ -68,7 +68,11 @@ if __name__ == '__main__':
         np.random.seed(training_config["seed"])
         torch.manual_seed(training_config["seed"])
 
-    sy_lib = generate_symbol_library(expr_config["num_variables"], expr_config["symbols"], expr_config["has_constants"])
+    extra_symbols = []
+    for i in range(2, expr_config["max_arity"]):
+        extra_symbols += ["+" + str(i), "*" + str(i)]
+    sy_lib, _ = generate_symbol_library(expr_config["num_variables"], expr_config["symbols"] + extra_symbols,
+                                     expr_config["max_arity"], expr_config["has_constants"])
     HVAE.add_symbols(sy_lib)
 
     trees = read_expressions_json(es_config["expression_set_path"])

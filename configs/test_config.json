@@ -1,7 +1,7 @@
 {
   "expression_definition": {
-    // Functions that occur in expressions
-    "symbols": ["sin", "cos", "exp", "sqrt", "log", "^2", "^3", "^4", "^5"],
+    // Single arity operations and functions that occur in expressions
+    "symbols": ["-", "/", "sin", "cos", "exp", "sqrt", "log", "^2", "^3", "^4", "^5"],
     // Operators and functions that occur in expressions
     "symbols2": ["+", "-", "*", "/", "sin", "cos", "exp", "sqrt", "log", "^2", "^3", "^4", "^5"],
     // Number of variables that occur in expressions
@@ -31,7 +31,7 @@
     "latent_size": 32,
     "seed": 18,
     // Path where model parameters will be saved. If empty string, the parameters won't be saved
-    "param_path": "../params/ng1_7_new.pt"
+    "param_path": "../params/ng1_7_new2.pt"
   },
   "reconstruction": {
     // If smaller dataset is True, it will train the model with the specified number of expressions
@@ -40,7 +40,7 @@
     // Number of folds for the K-Fold cross-validation
     "n_folds": 5,
     // Path where results of the evaluation will be saved
-    "results_path": "../results/hvae.txt"
+    "results_path": "../results/hvae2.txt"
   },
   "symbolic_regression": {
     // Name of the baseline: two options currently available:

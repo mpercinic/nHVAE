@@ -94,9 +94,6 @@ def is_float(element: any) -> bool:
     except ValueError:
         return False
 
-def are_opposites(symbol1, symbol2):
-    return (symbol1 == '+' and symbol2 == '-') or (symbol1 == '*' and symbol2 == '/')
-
 
 def tokens_to_tree(tokens, symbols):
     """
@@ -122,20 +119,22 @@ def tokens_to_tree(tokens, symbols):
         elif token in symbols and symbols[token]["type"].value == SymType.Operator.value:
             while len(operator_stack) > 0 and operator_stack[-1] != '(' \
                     and (symbols[operator_stack[-1]]["precedence"] > symbols[token]["precedence"]
-                            or are_opposites(symbols[token]["symbol"], symbols[operator_stack[-1]]["symbol"])):
+                        or (symbols[operator_stack[-1]]["precedence"] == symbols[token]["precedence"]
+                            and "arity" in symbols[operator_stack[-1]])):
+                            #or are_opposites(symbols[token]["symbol"], symbols[operator_stack[-1]]["symbol"])):
                 if symbols[operator_stack[-1]]["type"].value == SymType.Fun.value:
                     out_stack.append(Node(operator_stack.pop(), children=[out_stack.pop()]))
                 else:
                     op_current = operator_stack[-1]
-                    if len(operator_stack) > 1 and operator_stack[-2] == op_current:
+                    if operator_stack[-1] == '*' and len(operator_stack) > 1 and operator_stack[-2] == op_current:
                         children.append(out_stack.pop())
                         operator_stack.pop()
                     else:
                         children.append(out_stack.pop())
                         children.append(out_stack.pop())
-                        # children.reverse()
+                        children.reverse()
                         symbol = operator_stack.pop()
-                        if symbol != '^':
+                        if symbol == '+' or symbol == '*':
                             symbol += str(len(children))
                         out_stack.append(Node(symbol, children=children))
                         children = []
@@ -146,15 +145,16 @@ def tokens_to_tree(tokens, symbols):
                     out_stack.append(Node(operator_stack.pop(), children=[out_stack.pop()]))
                 else:
                     op_current = operator_stack[-1]
-                    if len(operator_stack) > 1 and operator_stack[-2] == op_current:
+                    if (operator_stack[-1] == '+' or operator_stack[-1] == '*') \
+                            and len(operator_stack) > 1 and operator_stack[-2] == op_current:
                         children.append(out_stack.pop())
                         operator_stack.pop()
                     else:
                         children.append(out_stack.pop())
                         children.append(out_stack.pop())
-                        # children.reverse()
+                        children.reverse()
                         symbol = operator_stack.pop()
-                        if symbol != '^':
+                        if symbol == '+' or symbol == '*':
                             symbol += str(len(children))
                         out_stack.append(Node(symbol, children=children))
                         children = []
@@ -231,7 +231,7 @@ if __name__ == '__main__':
 
     extra_symbols = []
     for i in range(2, expr_config["max_arity"]):
-        extra_symbols += ["+" + str(i), "-" + str(i), "*" + str(i), "/" + str(i)]
+        extra_symbols += ["+" + str(i), "*" + str(i)]
     sy_lib, sy_lib_basic = generate_symbol_library(expr_config["num_variables"], expr_config["symbols"] + extra_symbols,
                                      expr_config["max_arity"], expr_config["has_constants"])
     Node.add_symbols(sy_lib)
@@ -246,7 +246,9 @@ if __name__ == '__main__':
 
     # print(grammar)
 
-    # t = tokens_to_tree(['A', '-', '(', 'A', '+', 'A', ')', '-', 'A', '+', 'A'], so2)
+    '''t = tokens_to_tree(['A', '-', '(', 'A', '+', 'A', ')', '+', 'A', '+', 'A'], so2)
+    print(t)
+    print(t.to_pexpr())'''
 
     expressions = generate_expressions(grammar, es_config["num_expressions"], so2, expr_config["has_constants"], max_depth=es_config["max_tree_height"], max_length=es_config["max_expression_length"])
 

@@ -77,20 +77,20 @@ class Encoder(nn.Module):
 
     def recursive_forward(self, tree):
         children = []
-        lengths = []
+        #lengths = []
         for t in tree.children:
             children.append(self.recursive_forward(t))
-            lengths.append(t.batched_len())
+            #lengths.append(t.batched_len())
         if len(children) == 0:
             children.append(torch.zeros(tree.target.size(0), 1, self.hidden_size))
             child_sum = children[0]
         else:
-            l = sum(lengths)
-            child_sum = (lengths[0] / l) * children[0]
-            # child_sum = sum(children)
-            for i in range(len(children)):
+            # l = sum(lengths)
+            # child_sum = (lengths[0] / l) * children[0]
+            child_sum = sum(children)
+            '''for i in range(len(children)):
                 if i != 0:
-                    child_sum += (lengths[i] / l) * children[i]
+                    child_sum += (lengths[i] / l) * children[i]'''
 
         # left = left.mul(tree.mask[:, None, None])
         # right = right.mul(tree.mask[:, None, None])
@@ -132,19 +132,24 @@ class Decoder(nn.Module):
 
         hidden_a_i = self.gru_ancestral(symbol_probs, hidden_a)
         first = True
+        # hiddens = []
         for t in tree.children:
             if t is not None:
                 if first:
+                    # hiddens.append(hidden_a_i)
                     symbol_probs_f = self.recursive_forward(hidden_a_i, hidden_a_i, t)
                     # z = torch.zeros(hidden_a.size())
                     # hidden_f = self.z2h(z)
-                    hidden_f = hidden_a_i
-                    # hidden_f = torch.zeros(hidden_a.size())
+                    # hidden_f = hidden_a_i
+                    hidden_f = torch.zeros(hidden_a.size())
                 else:
                     hidden_f = self.gru_fraternal(symbol_probs_f, hidden_f)
                     hidden = torch.tanh(self.u_f(hidden_f) + self.u_a(hidden_a_i))
+                    # hiddens.append(hidden)
                     symbol_probs_f = self.recursive_forward(hidden_a_i, hidden, t)
                 first = False
+
+        # print((tree.symbols, hiddens))
         return symbol_probs
 
     # Used for inference to generate expression trees from latent vectorS
@@ -152,7 +157,7 @@ class Decoder(nn.Module):
         with torch.no_grad():
             mask = torch.ones(z.size(0)).bool()
             hidden = self.z2h(z)
-            batch = self.recursive_decode(hidden, hidden, symbol_dict, mask)
+            batch, _ = self.recursive_decode(hidden, hidden, symbol_dict, mask)
             return batch.to_expr_list()
 
     def recursive_decode(self, hidden_a, hidden, symbol_dict, mask):
@@ -163,29 +168,33 @@ class Decoder(nn.Module):
         first = True
         hidden_a_i = self.gru_ancestral(prediction, hidden_a)
         children = []
+        # hiddens = []
         for i in range(child_mask.size(0)):
             if first:
-                hidden_f = hidden_a_i
+                # hidden_f = hidden_a_i
                 # z = torch.zeros(hidden_a.size())
                 # hidden_f = self.z2h(z)
-                # hidden_f = torch.zeros(hidden_a.size())
+                hidden_f = torch.zeros(hidden_a.size())
                 if torch.any(child_mask[i]):
-                    child = self.recursive_decode(hidden_a_i, hidden_a_i, symbol_dict, child_mask[i])
+                    # hiddens.append(hidden_a_i)
+                    child, prediction_f = self.recursive_decode(hidden_a_i, hidden_a_i, symbol_dict, child_mask[i])
                     children.append(child)
-            else:
-                prediction_f = F.softmax(self.h2o(hidden_f), dim=2)
+            elif torch.any(child_mask[i]):
+                # prediction_f = F.softmax(self.h2o(hidden_f), dim=2)
                 hidden_f = self.gru_fraternal(prediction_f, hidden_f)
                 hidden = torch.tanh(self.u_f(hidden_f) + self.u_a(hidden_a_i))
-                if torch.any(child_mask[i]):
-                    child = self.recursive_decode(hidden_a_i, hidden, symbol_dict, child_mask[i])
-                    children.append(child)
+                # hiddens.append(hidden)
+                child, prediction_f = self.recursive_decode(hidden_a_i, hidden, symbol_dict, child_mask[i])
+                children.append(child)
                 # print(child_mask)
             first = False
+
+        # print((symbols, hiddens))
 
         node = BatchedNode()
         node.symbols = symbols
         node.children = children
-        return node
+        return (node, prediction)
 
     def sample_symbol(self, prediction, symbol_dict, mask):
         sampled = F.softmax(prediction, dim=2)

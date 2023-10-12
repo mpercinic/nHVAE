@@ -12,9 +12,9 @@ class SymType(Enum):
 def generate_symbol_library(num_vars, symbol_list, max_arity, has_constant=True):
     all_symbols = {
         # "+": {"symbol": '+', "type": SymType.Operator, "precedence": 0, "psymbol": "add"},
-        # "-": {"symbol": '-', "type": SymType.Operator, "precedence": 0, "psymbol": "sub"},
+        "-": {"symbol": '-', "type": SymType.Operator, "precedence": 0, "psymbol": "sub", "arity": 2, "key": "-"},
         # "*": {"symbol": '*', "type": SymType.Operator, "precedence": 1, "psymbol": "mul"},
-        # "/": {"symbol": '/', "type": SymType.Operator, "precedence": 1, "psymbol": "div"},
+        "/": {"symbol": '/', "type": SymType.Operator, "precedence": 1, "psymbol": "div", "arity": 2, "key": "/"},
         "^": {"symbol": "^", "type": SymType.Operator, "precedence": 2, "psymbol": "pow", "arity": 2, "key": "^"},
         "sqrt": {"symbol": 'sqrt', "type": SymType.Fun, "precedence": 5, "psymbol": "sqrt", "arity": 1, "key": "sqrt"},
         "sin": {"symbol": 'sin', "type": SymType.Fun, "precedence": 5, "psymbol": "sin", "arity": 1, "key": "sin"},
@@ -31,10 +31,10 @@ def generate_symbol_library(num_vars, symbol_list, max_arity, has_constant=True)
                                      "arity": i, "key": "+" + str(i)}
         all_symbols["*" + str(i)] = {"symbol": '*', "type": SymType.Operator, "precedence": 1, "psymbol": "mul",
                                      "arity": i, "key": "*" + str(i)}
-        all_symbols["-" + str(i)] = {"symbol": '-', "type": SymType.Operator, "precedence": 0, "psymbol": "sub",
+        '''all_symbols["-" + str(i)] = {"symbol": '-', "type": SymType.Operator, "precedence": 0, "psymbol": "sub",
                                      "arity": i, "key": "-" + str(i)}
         all_symbols["/" + str(i)] = {"symbol": '/', "type": SymType.Operator, "precedence": 1, "psymbol": "div",
-                                     "arity": i, "key": "/" + str(i)}
+                                     "arity": i, "key": "/" + str(i)}'''
     variable_names = 'ABDEFGHIJKLMNOPQRSTUVWXYZČŠŽ'
     symbols = []
     for i in range(num_vars):
@@ -57,9 +57,9 @@ def generate_symbol_library(num_vars, symbol_list, max_arity, has_constant=True)
 
     all_symbols2 = {
         "+": {"symbol": '+', "type": SymType.Operator, "precedence": 0, "psymbol": "add"},
-        "-": {"symbol": '-', "type": SymType.Operator, "precedence": 0, "psymbol": "sub"},
+        "-": {"symbol": '-', "type": SymType.Operator, "precedence": 0, "psymbol": "sub", "arity": 2},
         "*": {"symbol": '*', "type": SymType.Operator, "precedence": 1, "psymbol": "mul"},
-        "/": {"symbol": '/', "type": SymType.Operator, "precedence": 1, "psymbol": "div"},
+        "/": {"symbol": '/', "type": SymType.Operator, "precedence": 1, "psymbol": "div", "arity": 2},
         "^": {"symbol": "^", "type": SymType.Operator, "precedence": 2, "psymbol": "pow", "arity": 2},
         "sqrt": {"symbol": 'sqrt', "type": SymType.Fun, "precedence": 5, "psymbol": "sqrt", "arity": 1},
         "sin": {"symbol": 'sin', "type": SymType.Fun, "precedence": 5, "psymbol": "sin", "arity": 1},

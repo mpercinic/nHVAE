@@ -96,6 +96,7 @@ def train_hvae(model, trees, epochs=20, batch_size=32, verbose=True):
                             print(original_trees[i].to_pexpr())
                             print(f"O: {original_trees[i]}")
                             print(f"P: {decoded_trees[i]}")
+                            print(decoded_trees[i].to_pexpr())
 
 
 if __name__ == '__main__':
@@ -114,7 +115,7 @@ if __name__ == '__main__':
 
     extra_symbols = []
     for i in range(2, expr_config["max_arity"]):
-        extra_symbols += ["+" + str(i), "-" + str(i), "*" + str(i), "/" + str(i)]
+        extra_symbols += ["+" + str(i), "*" + str(i)]
 
     sy_lib, _ = generate_symbol_library(expr_config["num_variables"], expr_config["symbols"] + extra_symbols,
                                      expr_config["max_arity"], expr_config["has_constants"])

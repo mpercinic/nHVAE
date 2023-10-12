@@ -51,6 +51,11 @@ class Node:
     def symbol_arity(symbol):
         return Node._symbols[Node._s2c[symbol]]["arity"]
 
+    @staticmethod
+    def has_precedence(symbol1, symbol2):
+        return (Node.symbol_precedence(symbol1) == Node.symbol_precedence(symbol2)
+                and (symbol1 == '-' or symbol1 == '/'))
+
     def to_list(self, notation="infix"):
         self.children = [t for t in self.children if t is not None]
         if notation == "infix" and Node._symbols is None:
@@ -90,11 +95,12 @@ class Node:
                 first = True
                 for t in self.children:
                     expression += [self.symbol[0]] if not first else []
-                    first = False
                     subexpression = t.to_list(notation)
-                    if not is_float(t.symbol) and -1 < Node.symbol_precedence(t.symbol) <= Node.symbol_precedence(self.symbol):
+                    if -1 < Node.symbol_precedence(t.symbol) < Node.symbol_precedence(self.symbol) \
+                            or (not first and Node.has_precedence(self.symbol, t.symbol)):
                         subexpression = ["("] + subexpression + [")"]
                     expression += subexpression
+                    first = False
                 return expression
             else:
                 '''print(self.symbol)

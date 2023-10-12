@@ -42,20 +42,22 @@ def tokens_to_tree(tokens, symbols):
         elif token in symbols and symbols[token]["type"].value == SymType.Operator.value:
             while len(operator_stack) > 0 and operator_stack[-1] != '(' \
                     and (symbols[operator_stack[-1]]["precedence"] > symbols[token]["precedence"]
-                            or are_opposites(symbols[token]["symbol"], symbols[operator_stack[-1]]["symbol"])):
+                         or (symbols[operator_stack[-1]]["precedence"] == symbols[token]["precedence"]
+                             and "arity" in symbols[operator_stack[-1]])):
+                # or are_opposites(symbols[token]["symbol"], symbols[operator_stack[-1]]["symbol"])):
                 if symbols[operator_stack[-1]]["type"].value == SymType.Fun.value:
                     out_stack.append(Node(operator_stack.pop(), children=[out_stack.pop()]))
                 else:
                     op_current = operator_stack[-1]
-                    if len(operator_stack) > 1 and operator_stack[-2] == op_current:
+                    if operator_stack[-1] == '*' and len(operator_stack) > 1 and operator_stack[-2] == op_current:
                         children.append(out_stack.pop())
                         operator_stack.pop()
                     else:
                         children.append(out_stack.pop())
                         children.append(out_stack.pop())
-                        # children.reverse()
+                        children.reverse()
                         symbol = operator_stack.pop()
-                        if symbol != '^':
+                        if symbol == '+' or symbol == '*':
                             symbol += str(len(children))
                         out_stack.append(Node(symbol, children=children))
                         children = []
@@ -66,15 +68,16 @@ def tokens_to_tree(tokens, symbols):
                     out_stack.append(Node(operator_stack.pop(), children=[out_stack.pop()]))
                 else:
                     op_current = operator_stack[-1]
-                    if len(operator_stack) > 1 and operator_stack[-2] == op_current:
+                    if (operator_stack[-1] == '+' or operator_stack[-1] == '*') \
+                            and len(operator_stack) > 1 and operator_stack[-2] == op_current:
                         children.append(out_stack.pop())
                         operator_stack.pop()
                     else:
                         children.append(out_stack.pop())
                         children.append(out_stack.pop())
-                        # children.reverse()
+                        children.reverse()
                         symbol = operator_stack.pop()
-                        if symbol != '^':
+                        if symbol == '+' or symbol == '*':
                             symbol += str(len(children))
                         out_stack.append(Node(symbol, children=children))
                         children = []
