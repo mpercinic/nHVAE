@@ -189,8 +189,6 @@ class BatchedNode():
 
     def __init__(self, size=0, trees=None):
         self.symbols = ["" for _ in range(size)]
-        #self.left = None
-        #self.right = None
         self.children = []
 
         if trees is not None:
@@ -212,6 +210,12 @@ class BatchedNode():
         for t in self.children:
             len_sum += t.batched_len()
         return symbol_length / len(self.symbols) + len_sum
+
+    '''def batched_len(self):
+        len_sum = 0
+        for t in self.children:
+            len_sum += t.batched_len()
+        return 1 + len_sum'''
 
     def add_tree(self, tree=None):
         if tree is None:
@@ -275,11 +279,6 @@ class BatchedNode():
         for t in self.children:
             t.create_target()
 
-        '''if self.left is not None:
-            self.left.create_target()
-        if self.right is not None:
-            self.right.create_target()'''
-
     def to_expr_list(self):
         exprs = []
         for i in range(len(self.symbols)):
@@ -295,16 +294,11 @@ class BatchedNode():
         for t in self.children:
             exprs.append(t.get_expr_at_idx(idx))
 
-        #left = self.left.get_expr_at_idx(idx) if self.left is not None else None
-        #right = self.right.get_expr_at_idx(idx) if self.right is not None else None
-
         return Node(symbol, children=exprs)
 
     @staticmethod
     def get_prediction(tree):
         reps = []
-        '''if tree.left is not None:
-            reps.append(BatchedNode.get_prediction(tree.left))'''
 
         '''p = []
         for i in range(len(BatchedNode._symbols)):
@@ -316,9 +310,6 @@ class BatchedNode():
         target = tree.prediction[:, 0, :]
         reps.append(target[:, None, :])
 
-        '''if tree.right is not None:
-            reps.append(BatchedNode.get_prediction(tree.right))'''
-
         for t in tree.children:
             reps.append(BatchedNode.get_prediction(t))
 
@@ -327,8 +318,6 @@ class BatchedNode():
     @staticmethod
     def get_target(tree):
         reps = []
-        '''if tree.left is not None:
-            reps.append(BatchedNode.get_target(tree.left))'''
 
         target = torch.zeros(len(tree.symbols)).long()
         for i, s in enumerate(tree.symbols):
@@ -341,10 +330,11 @@ class BatchedNode():
         for t in tree.children:
             reps.append(BatchedNode.get_target(t))
 
-        '''if tree.right is not None:
-            reps.append(BatchedNode.get_target(tree.right))'''
-
         return torch.cat(reps, dim=1)
+
+    @staticmethod
+    def get_symbols():
+        return BatchedNode._symbols
 
 
 

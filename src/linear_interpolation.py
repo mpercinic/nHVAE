@@ -31,8 +31,13 @@ if __name__ == '__main__':
     expr_config = config["expression_definition"]
     es_config = config["expression_set_generation"]
     training_config = config["training"]
-    sy_lib = generate_symbol_library(expr_config["num_variables"], expr_config["symbols"], expr_config["has_constants"])
-    so = {s["symbol"]: s for s in sy_lib}
+
+    extra_symbols = []
+    for i in range(2, expr_config["max_arity"]):
+        extra_symbols += ["+" + str(i), "*" + str(i)]
+    sy_lib, sy_lib_basic = generate_symbol_library(expr_config["num_variables"], expr_config["symbols"] + extra_symbols,
+                                        expr_config["max_arity"], expr_config["has_constants"])
+    so = {s["symbol"]: s for s in sy_lib_basic}
     HVAE.add_symbols(sy_lib)
 
     model = torch.load(training_config["param_path"])

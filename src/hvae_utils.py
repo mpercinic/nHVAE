@@ -32,7 +32,7 @@ def tokens_to_tree(tokens, symbols):
     for token in tokens:
         if token == "(":
             operator_stack.append(token)
-        elif token in symbols and (symbols[token]["type"].value == SymType.Var.value or symbols[token]["type"].value == SymType.Const.value) or is_float(token):
+        elif token in symbols and (symbols[token]["type"].value == SymType.Var.value or symbols[token]["type"].value == SymType.Const.value):
             out_stack.append(Node(token, children=[]))
         elif token in symbols and symbols[token]["type"].value == SymType.Fun.value:
             if token[0] == "^":
@@ -44,7 +44,6 @@ def tokens_to_tree(tokens, symbols):
                     and (symbols[operator_stack[-1]]["precedence"] > symbols[token]["precedence"]
                          or (symbols[operator_stack[-1]]["precedence"] == symbols[token]["precedence"]
                              and "arity" in symbols[operator_stack[-1]])):
-                # or are_opposites(symbols[token]["symbol"], symbols[operator_stack[-1]]["symbol"])):
                 if symbols[operator_stack[-1]]["type"].value == SymType.Fun.value:
                     out_stack.append(Node(operator_stack.pop(), children=[out_stack.pop()]))
                 else:
@@ -84,7 +83,7 @@ def tokens_to_tree(tokens, symbols):
             operator_stack.pop()
             if len(operator_stack) > 0 and operator_stack[-1] in symbols and symbols[operator_stack[-1]]["type"].value == SymType.Fun.value:
                 out_stack.append(Node(operator_stack.pop(), children=[out_stack.pop()]))
-    if len(out_stack[-1].to_list()) != num_tokens:
+    if len(out_stack[-1].to_list()) < num_tokens:
         raise Exception(f"Error while parsing expression {start_expr}")
     return out_stack[-1]
 

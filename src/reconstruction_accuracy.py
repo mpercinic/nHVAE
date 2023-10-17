@@ -25,7 +25,7 @@ def one_fold(model, train, test, epochs, batch_size, verbose):
     return total_distance
 
 
-def one_experiment(name, trees, input_dim, latent_dim, epochs, batch_size, verbose, seed,
+def one_experiment(name, trees, input_dim, latent_dim, epochs, batch_size, verbose, seed, max_arity,
                    smaller_dataset=False, examples=2000, n_splits=5, results_path=None):
     kf = KFold(n_splits=n_splits)
     distances = []
@@ -41,7 +41,7 @@ def one_experiment(name, trees, input_dim, latent_dim, epochs, batch_size, verbo
             train = [trees[i] for i in train_idx]
 
         test = [trees[i] for i in test_idx]
-        model = HVAE(input_dim, latent_dim)
+        model = HVAE(input_dim, latent_dim, max_arity)
         distances.append(one_fold(model, train, test, epochs, batch_size, verbose))
         print(f"Mean: {np.mean(distances[-1])}, Var: {np.var(distances[-1])}")
         print()
@@ -79,5 +79,6 @@ if __name__ == '__main__':
 
     one_experiment(es_config["expression_set_path"], trees, len(sy_lib), training_config["latent_size"],
                    training_config["epochs"], training_config["batch_size"], training_config["verbose"],
-                   training_config["seed"], reconstruction_config["smaller_dataset"], reconstruction_config["num_examples"],
-                   reconstruction_config["n_folds"], reconstruction_config["results_path"])
+                   training_config["seed"], expr_config["max_arity"] - 1, reconstruction_config["smaller_dataset"],
+                   reconstruction_config["num_examples"], reconstruction_config["n_folds"],
+                   reconstruction_config["results_path"])

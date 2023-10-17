@@ -55,6 +55,7 @@ def train_hvae(model, trees, epochs=20, batch_size=32, verbose=True):
     iter_counter = 0
     total_iters = epochs*(len(dataset)//batch_size)
     lmbda = logistic_function(iter_counter, total_iters)
+    # lmbda = (np.tanh(-4.5) + 1) / 2
 
     midpoint = len(dataset) // (2 * batch_size)
 
@@ -82,6 +83,8 @@ def train_hvae(model, trees, epochs=20, batch_size=32, verbose=True):
 
                 lmbda = logistic_function(iter_counter, total_iters)
                 iter_counter += 1
+                '''if iter_counter < 9000:
+                    lmbda = (np.tanh((0.3333 * iter_counter - 4500) / 1000) + 1) / 2'''
 
                 if verbose and i == midpoint:
                     original_trees = batch.to_expr_list()
@@ -91,12 +94,11 @@ def train_hvae(model, trees, epochs=20, batch_size=32, verbose=True):
                         pickle.dump(z, f)
                     decoded_trees = model.decode(z)
                     for i in range(len(decoded_trees)):
-                        if decoded_trees[i] is not None:
-                            print()
-                            print(original_trees[i].to_pexpr())
-                            print(f"O: {original_trees[i]}")
-                            print(f"P: {decoded_trees[i]}")
-                            print(decoded_trees[i].to_pexpr())
+                        print()
+                        # print(original_trees[i].to_pexpr())
+                        print(f"O: {original_trees[i]}")
+                        print(f"P: {decoded_trees[i]}")
+                        # print(decoded_trees[i].to_pexpr())
 
 
 if __name__ == '__main__':
@@ -118,13 +120,13 @@ if __name__ == '__main__':
         extra_symbols += ["+" + str(i), "*" + str(i)]
 
     sy_lib, _ = generate_symbol_library(expr_config["num_variables"], expr_config["symbols"] + extra_symbols,
-                                     expr_config["max_arity"], expr_config["has_constants"])
+                                        expr_config["max_arity"], expr_config["has_constants"])
 
     HVAE.add_symbols(sy_lib)
 
     trees = read_expressions_json(es_config["expression_set_path"])
 
-    model = HVAE(len(sy_lib), training_config["latent_size"])
+    model = HVAE(len(sy_lib), training_config["latent_size"], expr_config["max_arity"] - 1)
 
     '''with open("test.pkl", 'rb') as f:
         z = pickle.load(f)

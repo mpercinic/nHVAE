@@ -31,7 +31,7 @@
     "latent_size": 32,
     "seed": 18,
     // Path where model parameters will be saved. If empty string, the parameters won't be saved
-    "param_path": "../params/ng1_7_new2.pt"
+    "param_path": "../params/ng1_7_encoder.pt"
   },
   "reconstruction": {
     // If smaller dataset is True, it will train the model with the specified number of expressions

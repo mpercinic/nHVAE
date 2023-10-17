@@ -2,7 +2,7 @@ import torch
 from torch.autograd import Variable
 import torch.nn.functional as F
 import torch.nn as nn
-from random import random
+import numpy as np
 
 from tree import Node, BatchedNode
 from symbol_library import SymType
@@ -11,13 +11,13 @@ from symbol_library import SymType
 class HVAE(nn.Module):
     _symbols = None
 
-    def __init__(self, input_size, output_size, hidden_size=None):
+    def __init__(self, input_size, output_size, max_arity, hidden_size=None):
         super(HVAE, self).__init__()
 
         if hidden_size is None:
             hidden_size = output_size
 
-        self.encoder = Encoder(input_size, hidden_size, output_size)
+        self.encoder = Encoder(input_size, hidden_size, output_size, max_arity)
         self.decoder = Decoder(output_size, hidden_size, input_size)
 
     def forward(self, tree):
@@ -49,51 +49,71 @@ class HVAE(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
+    def __init__(self, input_size, hidden_size, output_size, max_arity):
         super(Encoder, self).__init__()
         self.hidden_size = hidden_size
         self.gru = GRU221(input_size=input_size, hidden_size=hidden_size)
-        '''self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.grus = {}'''
         self.mu = nn.Linear(in_features=hidden_size, out_features=output_size)
         self.logvar = nn.Linear(in_features=hidden_size, out_features=output_size)
+        self.wms = []
+        for i in range(max_arity):
+            self.wms.append(nn.Linear(in_features=hidden_size, out_features=hidden_size))
+            torch.nn.init.xavier_uniform_(self.wms[i].weight)
+        self.w = nn.Linear(in_features=hidden_size, out_features=1)
+        self.w_a = nn.Linear(in_features=hidden_size, out_features=hidden_size)
 
         torch.nn.init.xavier_uniform_(self.mu.weight)
         torch.nn.init.xavier_uniform_(self.logvar.weight)
+        torch.nn.init.xavier_uniform_(self.w.weight)
+        torch.nn.init.xavier_uniform_(self.w_a.weight)
 
     def forward(self, tree):
-        # start = time.time()
-        # Check if the tree has target vectors
         if tree.target is None:
             tree.add_target_vectors()
 
         tree_encoding = self.recursive_forward(tree)
         mu = self.mu(tree_encoding)
         logvar = self.logvar(tree_encoding)
-        # end = time.time()
-        # print("Encoder: " + str(end-start))
         return mu, logvar
 
     def recursive_forward(self, tree):
         children = []
-        #lengths = []
         for t in tree.children:
             children.append(self.recursive_forward(t))
-            #lengths.append(t.batched_len())
         if len(children) == 0:
             children.append(torch.zeros(tree.target.size(0), 1, self.hidden_size))
             child_sum = children[0]
         else:
-            # l = sum(lengths)
-            # child_sum = (lengths[0] / l) * children[0]
-            child_sum = sum(children)
-            '''for i in range(len(children)):
-                if i != 0:
-                    child_sum += (lengths[i] / l) * children[i]'''
+            ms = []
+            i = 0
+            for c in children:
+                ms.append(torch.tanh(self.wms[i](c)))
+                i += 1
+            ms2 = []
+            for m in ms:
+                ms2.append(self.w(m))
+            aks = []
+            ms_sum = sum(ms2)
+            for m in ms2:
+                aks.append(m/ms_sum)
+            g = torch.zeros(children[0].size())
+            for a, c in zip(aks, children):
+                g += a * c
+            child_sum = torch.tanh(self.w_a(g))
 
-        # left = left.mul(tree.mask[:, None, None])
-        # right = right.mul(tree.mask[:, None, None])
+        '''else:
+            aks = []
+            i = 0
+            for c in children:
+                aks.append(torch.tanh(self.wms[i](c)))
+                i += 1
+            aks_sum = 0
+            for a in aks:
+                aks_sum += a[0]
+            child_sum = torch.zeros(children[0].size())
+            for a, c in zip(aks, children):
+                child_sum += (a / aks_sum) * c
+            child_sum = torch.tanh(child_sum)'''
 
         hidden = self.gru(tree.target, child_sum, children)
         hidden = hidden.mul(tree.mask[:, None, None])
@@ -118,25 +138,35 @@ class Decoder(nn.Module):
 
     # Used during training to guide the learning process
     def forward(self, z, tree):
-        # start = time.time()
         hidden = self.z2h(z)
+        # leaf_mask = torch.zeros(hidden.size(0))[:, None, None]
         self.recursive_forward(hidden, hidden, tree)
-        # end = time.time()
-        # print("Decoder: " + str(end - start))
         return tree
 
     def recursive_forward(self, hidden_a, hidden, tree):
         prediction = self.h2o(hidden)
         symbol_probs = F.softmax(prediction, dim=2)
+        '''prediction2 = torch.cat([prediction, leaf_mask], dim=2)
+        for i in range(len(prediction2)):
+            if prediction2[i][0][-1] == 1:
+                for j in range(len(prediction2[i][0])-1):
+                    prediction2[i][0][j] = 0'''
         tree.prediction = prediction
+
+        '''predictions = []
+        for i in range(len(symbol_probs)):
+            predictions.append(BatchedNode.get_symbols()[torch.argmax(symbol_probs[i, 0, :])]["key"])
+        # print(predictions)
+        for i in range(len(predictions)):  # for t in tree.children
+            if predictions[i] == SymType.Var.value or predictions[i] == SymType.Const.value:
+                leaf_mask[i][0][0] = 1
+                print("here")'''
 
         hidden_a_i = self.gru_ancestral(symbol_probs, hidden_a)
         first = True
-        # hiddens = []
         for t in tree.children:
             if t is not None:
                 if first:
-                    # hiddens.append(hidden_a_i)
                     symbol_probs_f = self.recursive_forward(hidden_a_i, hidden_a_i, t)
                     # z = torch.zeros(hidden_a.size())
                     # hidden_f = self.z2h(z)
@@ -145,11 +175,9 @@ class Decoder(nn.Module):
                 else:
                     hidden_f = self.gru_fraternal(symbol_probs_f, hidden_f)
                     hidden = torch.tanh(self.u_f(hidden_f) + self.u_a(hidden_a_i))
-                    # hiddens.append(hidden)
                     symbol_probs_f = self.recursive_forward(hidden_a_i, hidden, t)
                 first = False
 
-        # print((tree.symbols, hiddens))
         return symbol_probs
 
     # Used for inference to generate expression trees from latent vectorS
@@ -168,7 +196,6 @@ class Decoder(nn.Module):
         first = True
         hidden_a_i = self.gru_ancestral(prediction, hidden_a)
         children = []
-        # hiddens = []
         for i in range(child_mask.size(0)):
             if first:
                 # hidden_f = hidden_a_i
@@ -176,25 +203,21 @@ class Decoder(nn.Module):
                 # hidden_f = self.z2h(z)
                 hidden_f = torch.zeros(hidden_a.size())
                 if torch.any(child_mask[i]):
-                    # hiddens.append(hidden_a_i)
                     child, prediction_f = self.recursive_decode(hidden_a_i, hidden_a_i, symbol_dict, child_mask[i])
                     children.append(child)
             elif torch.any(child_mask[i]):
                 # prediction_f = F.softmax(self.h2o(hidden_f), dim=2)
                 hidden_f = self.gru_fraternal(prediction_f, hidden_f)
                 hidden = torch.tanh(self.u_f(hidden_f) + self.u_a(hidden_a_i))
-                # hiddens.append(hidden)
                 child, prediction_f = self.recursive_decode(hidden_a_i, hidden, symbol_dict, child_mask[i])
                 children.append(child)
                 # print(child_mask)
             first = False
 
-        # print((symbols, hiddens))
-
         node = BatchedNode()
         node.symbols = symbols
         node.children = children
-        return (node, prediction)
+        return node, prediction
 
     def sample_symbol(self, prediction, symbol_dict, mask):
         sampled = F.softmax(prediction, dim=2)
@@ -245,45 +268,16 @@ class GRU221(nn.Module):
         torch.nn.init.xavier_uniform_(self.whn.weight)
 
     def forward(self, x, h_sum, hs):
-        #h = torch.cat(hs, dim=2)
         rs = []
         for h in hs:
             rs.append(torch.sigmoid(self.wir(x) + self.whr(h)))
         z = torch.sigmoid(self.wiz(x) + self.whz(h_sum))
-        s = rs[0] * hs[0]
-        first = True
+        s = torch.zeros(hs[0].size())
         for r, h in zip(rs, hs):
-            if not first:
-                s += r * h
-            first = False
+            s += r * h
         n = torch.tanh(self.win(x) + self.whn(s))
         return (1 - z) * n + z * h_sum
 
-
-'''class GRU122(nn.Module):
-    def __init__(self, input_size, hidden_size):
-        super(GRU122, self).__init__()
-        self.hidden_size = hidden_size
-        self.wir = nn.Linear(in_features=input_size, out_features=2*hidden_size)
-        self.whr = nn.Linear(in_features=hidden_size, out_features=2*hidden_size)
-        self.wiz = nn.Linear(in_features=input_size, out_features=2*hidden_size)
-        self.whz = nn.Linear(in_features=hidden_size, out_features=2*hidden_size)
-        self.win = nn.Linear(in_features=input_size, out_features=2*hidden_size)
-        self.whn = nn.Linear(in_features=hidden_size, out_features=2*hidden_size)
-        torch.nn.init.xavier_uniform_(self.wir.weight)
-        torch.nn.init.xavier_uniform_(self.whr.weight)
-        torch.nn.init.xavier_uniform_(self.wiz.weight)
-        torch.nn.init.xavier_uniform_(self.whz.weight)
-        torch.nn.init.xavier_uniform_(self.win.weight)
-        torch.nn.init.xavier_uniform_(self.whn.weight)
-
-    def forward(self, x, h):
-        r = torch.sigmoid(self.wir(x) + self.whr(h))
-        z = torch.sigmoid(self.wiz(x) + self.whz(h))
-        n = torch.tanh(self.win(x) + r * self.whn(h))
-        dh = h.repeat(1, 1, 2)
-        out = (1 - z) * n + z * dh
-        return torch.split(out, self.hidden_size, dim=2)'''
 
 class GRUAncestral(nn.Module):
     def __init__(self, input_size, hidden_size):

@@ -121,7 +121,6 @@ def tokens_to_tree(tokens, symbols):
                     and (symbols[operator_stack[-1]]["precedence"] > symbols[token]["precedence"]
                         or (symbols[operator_stack[-1]]["precedence"] == symbols[token]["precedence"]
                             and "arity" in symbols[operator_stack[-1]])):
-                            #or are_opposites(symbols[token]["symbol"], symbols[operator_stack[-1]]["symbol"])):
                 if symbols[operator_stack[-1]]["type"].value == SymType.Fun.value:
                     out_stack.append(Node(operator_stack.pop(), children=[out_stack.pop()]))
                 else:
