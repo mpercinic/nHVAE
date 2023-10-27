@@ -2,6 +2,7 @@ from argparse import ArgumentParser
 import json
 
 import numpy as np
+import torch
 from ProGED.generators import GeneratorGrammar
 
 from tree import Node
@@ -95,7 +96,7 @@ def is_float(element: any) -> bool:
         return False
 
 
-def tokens_to_tree(tokens, symbols):
+def tokens_to_tree(tokens, symbols, max_arity):
     """
     tokens : list of string tokens
     symbols: dictionary of possible tokens -> attributes, each token must have attributes: nargs (0-2), order
@@ -125,7 +126,8 @@ def tokens_to_tree(tokens, symbols):
                     out_stack.append(Node(operator_stack.pop(), children=[out_stack.pop()]))
                 else:
                     op_current = operator_stack[-1]
-                    if operator_stack[-1] == '*' and len(operator_stack) > 1 and operator_stack[-2] == op_current:
+                    if operator_stack[-1] == '*' and len(operator_stack) > 1 and operator_stack[-2] == op_current \
+                            and len(children) < max_arity - 2:
                         children.append(out_stack.pop())
                         operator_stack.pop()
                     else:
@@ -144,8 +146,8 @@ def tokens_to_tree(tokens, symbols):
                     out_stack.append(Node(operator_stack.pop(), children=[out_stack.pop()]))
                 else:
                     op_current = operator_stack[-1]
-                    if (operator_stack[-1] == '+' or operator_stack[-1] == '*') \
-                            and len(operator_stack) > 1 and operator_stack[-2] == op_current:
+                    if (operator_stack[-1] == '+' or operator_stack[-1] == '*') and len(operator_stack) > 1 \
+                            and operator_stack[-2] == op_current and len(children) < max_arity - 2:
                         children.append(out_stack.pop())
                         operator_stack.pop()
                     else:
@@ -165,10 +167,13 @@ def tokens_to_tree(tokens, symbols):
     return out_stack[-1]
 
 
-def generate_expressions(grammar, number_of_expressions, symbols, has_constants=True, max_depth=7, max_length=32):
+def generate_expressions(grammar, number_of_expressions, number_of_all_expressions, symbols, max_arity, has_constants=True, max_depth=7):
     generator = GeneratorGrammar(grammar)
     expression_set = set()
     expressions = []
+    expressions_final = []
+    for j in range(max_depth):
+        expressions.append([])
     with open("../expressions.pkl", 'rb') as f:
         exprs = pickle.load(f)
     for expr in exprs:
@@ -178,18 +183,10 @@ def generate_expressions(grammar, number_of_expressions, symbols, has_constants=
             pass
 
         expr_str = "".join(expr)
-        if expr_str in expression_set:
-            continue
 
         try:
-            expr_tree = tokens_to_tree(expr, symbols)
-            expr_length = 0
-            for i in expr:
-                if i != '(' and i != ')':
-                    expr_length += 1
-            if expr_tree.height() > max_depth or expr_length > max_length:
-                continue
-            expressions.append(expr_tree)
+            expr_tree = tokens_to_tree(expr, symbols, max_arity)
+            expressions_final.append(expr_tree)
             expression_set.add(expr_str)
         except:
             continue
@@ -210,13 +207,53 @@ def generate_expressions(grammar, number_of_expressions, symbols, has_constants=
             for i in expr:
                 if i != '(' and i != ')':
                     expr_length += 1
-            if expr_tree.height() > max_depth or expr_length > max_length:
+            if expr_tree.height() > max_depth:  # or expr_length > max_length:
                 continue
             expressions.append(expr_tree)
             expression_set.add(expr_str)
         except:
             continue'''
-    return expressions
+    '''
+    while len(expression_set) < number_of_all_expressions:
+        if len(expression_set) % 500 == 0:
+            print(f"Unique expressions generated so far: {len(expression_set)}")
+            #for e in expressions[-2]:
+            #    print((len(e.to_list()), "".join(e.to_list())))
+        expr = generator.generate_one()[0]
+        if has_constants:
+            pass
+
+
+        try:
+            expr_tree = tokens_to_tree(expr, symbols)
+            #expr_length = 0
+            #for i in expr:
+            #    if i != '(' and i != ')':
+            #        expr_length += 1
+            tree_height = expr_tree.height()
+            expr_str = "".join(expr_tree.to_list())
+            if expr_str in expression_set:
+                continue
+            max_bf = expr_tree.max_branching_factor()
+            if tree_height > max_depth or len(expr_tree.to_list()) > 32:  # or expr_length > max_length:
+                continue
+
+            expressions[max_bf].append(expr_tree)
+            expressions_final.append(expr_tree)
+            expression_set.add(expr_str)
+            if len(expression_set) % 10000 == 0:
+                for e in expressions:
+                    print(len(e))
+        except:
+            continue'''
+    '''expressions_final = []
+    for j in range(len(expressions)):
+        length = len(expressions[j])
+        stop = round(length*number_of_expressions/number_of_all_expressions)
+        sample = np.random.permutation(length)
+        for k in range(stop):
+            expressions_final.append(expressions[j][sample[k]])'''
+    return expressions_final
 
 
 if __name__ == '__main__':
@@ -229,7 +266,7 @@ if __name__ == '__main__':
     es_config = config["expression_set_generation"]
 
     extra_symbols = []
-    for i in range(2, expr_config["max_arity"]):
+    for i in range(2, expr_config["max_arity"] + 1):
         extra_symbols += ["+" + str(i), "*" + str(i)]
     sy_lib, sy_lib_basic = generate_symbol_library(expr_config["num_variables"], expr_config["symbols"] + extra_symbols,
                                      expr_config["max_arity"], expr_config["has_constants"])
@@ -249,7 +286,10 @@ if __name__ == '__main__':
     print(t)
     print(t.to_pexpr())'''
 
-    expressions = generate_expressions(grammar, es_config["num_expressions"], so2, expr_config["has_constants"], max_depth=es_config["max_tree_height"], max_length=es_config["max_expression_length"])
+    expressions = generate_expressions(grammar, es_config["num_expressions"], es_config["num_all_expressions"],
+                                       so2, expr_config["max_arity"], expr_config["has_constants"],
+                                       max_depth=es_config["max_tree_height"])
+    print(len(expressions))
 
     expr_dict = [tree.to_dict() for tree in expressions]
 

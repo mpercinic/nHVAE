@@ -39,6 +39,14 @@ class Node:
             height_max = t.height()
         return 1 + height_max
 
+    def max_branching_factor(self):
+        max_bf = len(self.children)
+        for t in self.children:
+            bf = t.max_branching_factor()
+            if bf > max_bf:
+                max_bf = bf
+        return max_bf
+
     @staticmethod
     def symbol_type(symbol):
         return Node._symbols[Node._s2c[symbol]]["type"].value
@@ -200,22 +208,6 @@ class BatchedNode():
     def add_symbols(symbols):
         BatchedNode._symbols = symbols
         BatchedNode._s2c = {s["key"]: i for i, s in enumerate(symbols)}
-
-    def batched_len(self):
-        symbol_length = 0
-        for s in self.symbols:
-            if len(s) > 0:
-                symbol_length += 1
-        len_sum = 0.0
-        for t in self.children:
-            len_sum += t.batched_len()
-        return symbol_length / len(self.symbols) + len_sum
-
-    '''def batched_len(self):
-        len_sum = 0
-        for t in self.children:
-            len_sum += t.batched_len()
-        return 1 + len_sum'''
 
     def add_tree(self, tree=None):
         if tree is None:

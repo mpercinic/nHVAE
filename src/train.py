@@ -93,7 +93,8 @@ def train_hvae(model, trees, epochs=20, batch_size=32, verbose=True):
                     with open(filename, "wb") as f:
                         pickle.dump(z, f)
                     decoded_trees = model.decode(z)
-                    for i in range(len(decoded_trees)):
+                    # for i in range(len(decoded_trees)):
+                    for i in range(1):
                         print()
                         # print(original_trees[i].to_pexpr())
                         print(f"O: {original_trees[i]}")
@@ -116,7 +117,7 @@ if __name__ == '__main__':
         torch.manual_seed(training_config["seed"])
 
     extra_symbols = []
-    for i in range(2, expr_config["max_arity"]):
+    for i in range(2, expr_config["max_arity"] + 1):
         extra_symbols += ["+" + str(i), "*" + str(i)]
 
     sy_lib, _ = generate_symbol_library(expr_config["num_variables"], expr_config["symbols"] + extra_symbols,
@@ -126,7 +127,7 @@ if __name__ == '__main__':
 
     trees = read_expressions_json(es_config["expression_set_path"])
 
-    model = HVAE(len(sy_lib), training_config["latent_size"], expr_config["max_arity"] - 1)
+    model = HVAE(len(sy_lib), training_config["latent_size"], expr_config["max_arity"])
 
     '''with open("test.pkl", 'rb') as f:
         z = pickle.load(f)

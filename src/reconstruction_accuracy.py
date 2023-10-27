@@ -69,7 +69,7 @@ if __name__ == '__main__':
         torch.manual_seed(training_config["seed"])
 
     extra_symbols = []
-    for i in range(2, expr_config["max_arity"]):
+    for i in range(2, expr_config["max_arity"] + 1):
         extra_symbols += ["+" + str(i), "*" + str(i)]
     sy_lib, _ = generate_symbol_library(expr_config["num_variables"], expr_config["symbols"] + extra_symbols,
                                      expr_config["max_arity"], expr_config["has_constants"])
@@ -79,6 +79,6 @@ if __name__ == '__main__':
 
     one_experiment(es_config["expression_set_path"], trees, len(sy_lib), training_config["latent_size"],
                    training_config["epochs"], training_config["batch_size"], training_config["verbose"],
-                   training_config["seed"], expr_config["max_arity"] - 1, reconstruction_config["smaller_dataset"],
+                   training_config["seed"], expr_config["max_arity"], reconstruction_config["smaller_dataset"],
                    reconstruction_config["num_examples"], reconstruction_config["n_folds"],
                    reconstruction_config["results_path"])

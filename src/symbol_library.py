@@ -26,7 +26,7 @@ def generate_symbol_library(num_vars, symbol_list, max_arity, has_constant=True)
         "^4": {"symbol": '^4', "type": SymType.Fun, "precedence": -1, "psymbol": "n4", "arity": 1, "key": "^4"},
         "^5": {"symbol": '^5', "type": SymType.Fun, "precedence": -1, "psymbol": "n5", "arity": 1, "key": "^5"},
     }
-    for i in range(2, max_arity):
+    for i in range(2, max_arity + 1):
         all_symbols["+" + str(i)] = {"symbol": '+', "type": SymType.Operator, "precedence": 0, "psymbol": "add",
                                      "arity": i, "key": "+" + str(i)}
         all_symbols["*" + str(i)] = {"symbol": '*', "type": SymType.Operator, "precedence": 1, "psymbol": "mul",
