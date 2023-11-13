@@ -224,7 +224,7 @@ if __name__ == '__main__':
             results.append(one_sr_run(config, baseline, re_train, seed))
 
     test_set = read_eq_data(sr_config["test_set_path"])
-    re_test = RustEval(train_set, default_value=sr_config["default_error"])
+    re_test = RustEval(test_set, default_value=sr_config["default_error"])
     for i in range(len(results)):
         results[i] = check_on_test_set(results[i], re_test, so)
 

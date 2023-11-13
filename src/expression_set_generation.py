@@ -37,17 +37,27 @@ def generate_grammar(symbols):
             raise Exception("Error during generation of the grammar")
 
     if 0 in operators:
-        op_prob = 0.4 / len(operators[0])
+        '''op_prob = 0.4 / len(operators[0])
         for op in operators[0]:
-            grammar += f"E -> E '{op}' F [{op_prob}]\n"
+            grammar += f"E -> E '{op}' F [{op_prob}]\n"'''
+        grammar += "E -> E '-' F [0.08]\n"
+        grammar += "E -> E '+' F [0.2]\n"
+        grammar += "E -> E '+' F '+' F [0.08]\n"
+        grammar += "E -> E '+' F '+' F '+' F [0.03]\n"
+        grammar += "E -> E '+' F '+' F '+' F '+' F [0.01]\n"
         grammar += "E -> F [0.6]\n"
     else:
         grammar += "E -> F [1.0]\n"
 
     if 1 in operators:
-        op_prob = 0.4 / len(operators[1])
+        '''op_prob = 0.4 / len(operators[1])
         for op in operators[1]:
-            grammar += f"F -> F '{op}' T [{op_prob}]\n"
+            grammar += f"F -> F '{op}' T [{op_prob}]\n"'''
+        grammar += "F -> F '/' T [0.08]\n"
+        grammar += "F -> F '*' T [0.2]\n"
+        grammar += "F -> F '*' T '*' T [0.08]\n"
+        grammar += "F -> F '*' T '*' T '*' T [0.03]\n"
+        grammar += "F -> F '*' T '*' T '*' T '*' T [0.01]\n"
         grammar += "F -> T [0.6]\n"
     else:
         grammar += "F -> T [1.0]\n"
@@ -88,6 +98,8 @@ def generate_grammar(symbols):
 def is_float(element: any) -> bool:
     #If you expect None to be passed:
     if element is None:
+        return False
+    elif element[0] == '+':
         return False
     try:
         float(element)
@@ -174,7 +186,9 @@ def generate_expressions(grammar, number_of_expressions, number_of_all_expressio
     expressions_final = []
     for j in range(max_depth):
         expressions.append([])
-    with open("../expressions.pkl", 'rb') as f:
+    #with open("../expressions.pkl", 'rb') as f:
+    #    exprs = pickle.load(f)
+    with open("../expressions_c_equal.pkl", 'rb') as f:
         exprs = pickle.load(f)
     for expr in exprs:
         if len(expression_set) % 500 == 0:
@@ -213,19 +227,17 @@ def generate_expressions(grammar, number_of_expressions, number_of_all_expressio
             expression_set.add(expr_str)
         except:
             continue'''
-    '''
-    while len(expression_set) < number_of_all_expressions:
+
+    '''while len(expression_set) < number_of_all_expressions:
         if len(expression_set) % 500 == 0:
             print(f"Unique expressions generated so far: {len(expression_set)}")
-            #for e in expressions[-2]:
-            #    print((len(e.to_list()), "".join(e.to_list())))
         expr = generator.generate_one()[0]
         if has_constants:
             pass
 
 
         try:
-            expr_tree = tokens_to_tree(expr, symbols)
+            expr_tree = tokens_to_tree(expr, symbols, max_arity)
             #expr_length = 0
             #for i in expr:
             #    if i != '(' and i != ')':
@@ -241,14 +253,14 @@ def generate_expressions(grammar, number_of_expressions, number_of_all_expressio
             expressions[max_bf].append(expr_tree)
             expressions_final.append(expr_tree)
             expression_set.add(expr_str)
-            if len(expression_set) % 10000 == 0:
-                for e in expressions:
-                    print(len(e))
         except:
-            continue'''
-    '''expressions_final = []
+            continue
+    with open("all_expressions.pkl", "wb") as f:
+        pickle.dump(expressions, f)
+    expressions_final = []
     for j in range(len(expressions)):
         length = len(expressions[j])
+        print(length)
         stop = round(length*number_of_expressions/number_of_all_expressions)
         sample = np.random.permutation(length)
         for k in range(stop):
@@ -271,7 +283,6 @@ if __name__ == '__main__':
     sy_lib, sy_lib_basic = generate_symbol_library(expr_config["num_variables"], expr_config["symbols"] + extra_symbols,
                                      expr_config["max_arity"], expr_config["has_constants"])
     Node.add_symbols(sy_lib)
-    # so = {s["symbol"]: s for s in sy_lib}
     so2 = {s["symbol"]: s for s in sy_lib_basic}
 
     # Optional (recommended): Generate training set from a custom grammar
@@ -280,11 +291,7 @@ if __name__ == '__main__':
     if grammar is None:
         grammar = generate_grammar(sy_lib)
 
-    # print(grammar)
-
-    '''t = tokens_to_tree(['A', '-', '(', 'A', '+', 'A', ')', '+', 'A', '+', 'A'], so2)
-    print(t)
-    print(t.to_pexpr())'''
+    # print(tokens_to_tree(["A", "+", "A", "+", "(", "A", "+", "A", ")"], so2, expr_config["max_arity"]).symbol)
 
     expressions = generate_expressions(grammar, es_config["num_expressions"], es_config["num_all_expressions"],
                                        so2, expr_config["max_arity"], expr_config["has_constants"],

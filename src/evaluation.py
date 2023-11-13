@@ -124,9 +124,11 @@ class RustEval:
 
 if __name__ == '__main__':
     data = read_eq_data("../data/nguyen/nguyen10_test.csv")
-    data = np.array([[1., 2., 3., 4.], [2., 3., 4., 5.]]).T
+    #data = np.array([[1., 2., 3., 4.], [2., 3., 4., 5.]]).T
+    data = np.array([[1., 2., 3., 4.], [2., 9., 28., 65.]]).T
     rev = RustEval(data)
-    print(rev.fit_and_evaluate(["A", "1", "/", "C", "+"]))
+    #print(rev.fit_and_evaluate(["A", "1", "/", "C", "+"]))
+    print(rev.fit_and_evaluate(["A", "A", "A", "*3", "C", "+2"]))
 # names = ["X", "Y"]
 # evaluator = Evaluator(data, names)
 # print(evaluator.eval_expr(["X", "Y", "+"]))

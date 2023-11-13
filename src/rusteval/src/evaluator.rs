@@ -19,18 +19,10 @@ impl Evaluator {
        let mut stack: Vec<Array1<f64>> = Vec::new();
         for &t in expr {
             match t {
-                "+" => {
-                    let val = stack.pop().ok_or(PyValueError::new_err("Exception during evaluation: Ran out of tokens in the stack."))? + stack.pop().ok_or(PyValueError::new_err("Exception during evaluation: Ran out of tokens in the stack."))?;
-                    stack.push(val)
-                }
                 "-" => {
                     let b = stack.pop().ok_or(PyValueError::new_err("Exception during evaluation: Ran out of tokens in the stack."))?;
                     let a = stack.pop().ok_or(PyValueError::new_err("Exception during evaluation: Ran out of tokens in the stack."))?;
                     stack.push(a-b)
-                }
-                "*" => {
-                    let a = stack.pop().ok_or(PyValueError::new_err("Exception during evaluation: Ran out of tokens in the stack."))? * stack.pop().ok_or(PyValueError::new_err("Exception during evaluation: Ran out of tokens in the stack."))?;
-                    stack.push(a)
                 }
                 "/" => {
                     let b = stack.pop().ok_or(PyValueError::new_err("Exception during evaluation: Ran out of tokens in the stack."))?;
@@ -104,14 +96,37 @@ impl Evaluator {
                     stack.push(Array1::<f64>::zeros(self.var_len).map(|x| x+c));
                 }
                 _ => {
-                    if self.data.contains_key(t) {
-                        let variable = self.data.get(t).unwrap().clone();
-                        stack.push(variable);
-                    }
-                    else {
-                        match t.parse::<f64>() {
-                            Ok(v) => stack.push(Array1::<f64>::zeros(self.var_len).map(|x| x+v)),
-                            Err(_) => return Err(PyValueError::new_err(format!("Exception during evaluation: Token {} not found, check tokens or the rusteval/src/lib.rs file.", t)))
+                    let c = t.chars().next().unwrap();
+                    match c {
+                        '+' => {
+                            let mut s = t.clone().chars();
+                            s.next();
+                            let mut a = stack.pop().ok_or(PyValueError::new_err("Exception during evaluation: Ran out of tokens in the stack."))?;
+                            for _ in 0..s.as_str().parse::<i32>().unwrap() - 1 {
+                                a = stack.pop().ok_or(PyValueError::new_err("Exception during evaluation: Ran out of tokens in the stack."))? + a;
+                            }
+                            stack.push(a);
+                        }
+                        '*' => {
+                            let mut s = t.clone().chars();
+                            s.next();
+                            let mut a = stack.pop().ok_or(PyValueError::new_err("Exception during evaluation: Ran out of tokens in the stack."))?;
+                            for _ in 0..s.as_str().parse::<i32>().unwrap() - 1 {
+                                a = stack.pop().ok_or(PyValueError::new_err("Exception during evaluation: Ran out of tokens in the stack."))? * a;
+                            }
+                            stack.push(a);
+                        }
+                        _ => {
+                            if self.data.contains_key(t) {
+                                let variable = self.data.get(t).unwrap().clone();
+                                stack.push(variable);
+                            }
+                            else {
+                                match t.parse::<f64>() {
+                                    Ok(v) => stack.push(Array1::<f64>::zeros(self.var_len).map(|x| x+v)),
+                                    Err(_) => return Err(PyValueError::new_err(format!("Exception during evaluation: Token {} not found, check tokens or the rusteval/src/lib.rs file.", t)))
+                                }
+                            }
                         }
                     }
                 }

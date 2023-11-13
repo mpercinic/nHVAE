@@ -2,7 +2,6 @@ import commentjson as cjson
 import json
 from symbol_library import SymType
 from tree import Node, BatchedNode
-# from expression_set_generation import are_opposites, is_float
 
 
 def read_expressions(filepath):

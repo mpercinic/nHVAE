@@ -9,6 +9,9 @@ import pickle
 from hvae_utils import read_expressions_json, load_config_file, create_batch
 from model import HVAE
 from symbol_library import generate_symbol_library
+from tree import Node
+
+import zss
 
 
 def collate_fn(batch):
@@ -46,6 +49,10 @@ def logistic_function(iter, total_iters, supremum=0.045):
     return supremum/(1+50*np.exp(-10*x))
 
 
+def symbol_distance(s1, s2):
+    return int(s1 != s2)
+
+
 def train_hvae(model, trees, epochs=20, batch_size=32, verbose=True):
     dataset = TreeDataset(trees)
 
@@ -55,13 +62,15 @@ def train_hvae(model, trees, epochs=20, batch_size=32, verbose=True):
     iter_counter = 0
     total_iters = epochs*(len(dataset)//batch_size)
     lmbda = logistic_function(iter_counter, total_iters)
-    # lmbda = (np.tanh(-4.5) + 1) / 2
 
     midpoint = len(dataset) // (2 * batch_size)
 
     for epoch in range(epochs):
         sampler = TreeBatchSampler(batch_size, len(dataset))
         bce, kl, total, num_iters = 0, 0, 0, 0
+
+        tree_count = 0
+        editdist_sum = 0
 
         with tqdm(total=len(dataset), desc=f'Testing - Epoch: {epoch + 1}/{epochs}', unit='chunks') as prog_bar:
             for i, tree_ids in enumerate(sampler):
@@ -78,28 +87,28 @@ def train_hvae(model, trees, epochs=20, batch_size=32, verbose=True):
                 prog_bar.set_postfix(**{'run:': "HVAE",
                                         'loss': (bce+kl) / num_iters,
                                         'BCE': bce / num_iters,
-                                        'KLD': kl / num_iters})
+                                        'KLD': kl / num_iters,
+                                        'avg_editdist': editdist_sum / tree_count if tree_count != 0 else "nan"})
                 prog_bar.update(batch_size)
 
                 lmbda = logistic_function(iter_counter, total_iters)
                 iter_counter += 1
-                '''if iter_counter < 9000:
-                    lmbda = (np.tanh((0.3333 * iter_counter - 4500) / 1000) + 1) / 2'''
 
                 if verbose and i == midpoint:
                     original_trees = batch.to_expr_list()
                     z = model.encode(batch)[0]
-                    filename = "test.pkl"
-                    with open(filename, "wb") as f:
-                        pickle.dump(z, f)
                     decoded_trees = model.decode(z)
-                    # for i in range(len(decoded_trees)):
-                    for i in range(1):
-                        print()
-                        # print(original_trees[i].to_pexpr())
-                        print(f"O: {original_trees[i]}")
-                        print(f"P: {decoded_trees[i]}")
-                        # print(decoded_trees[i].to_pexpr())
+                    for i in range(len(decoded_trees)):
+                        editdist = zss.simple_distance(original_trees[i], decoded_trees[i],
+                                                       get_label=Node.get_symbol, label_dist=symbol_distance)
+                        if i == 0:
+                            print()
+                            # print(original_trees[i].to_pexpr())
+                            print(f"O: {original_trees[i]}")
+                            print(f"P: {decoded_trees[i]}")
+                            print(int(editdist))
+                        editdist_sum += int(editdist)
+                        tree_count += 1
 
 
 if __name__ == '__main__':
@@ -128,16 +137,6 @@ if __name__ == '__main__':
     trees = read_expressions_json(es_config["expression_set_path"])
 
     model = HVAE(len(sy_lib), training_config["latent_size"], expr_config["max_arity"])
-
-    '''with open("test.pkl", 'rb') as f:
-        z = pickle.load(f)
-    decoded_trees = model.decode(z)
-    for i in range(len(decoded_trees)):
-        if decoded_trees[i] is not None:
-            print()
-            #print(original_trees[i].to_pexpr())
-            #print(f"O: {original_trees[i]}")
-            print(f"P: {decoded_trees[i]}")'''
 
     train_hvae(model, trees, training_config["epochs"], training_config["batch_size"], training_config["verbose"])
 

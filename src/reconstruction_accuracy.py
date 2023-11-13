@@ -4,12 +4,17 @@ import numpy as np
 import torch
 from sklearn.model_selection import KFold
 import editdistance
+import zss
 
 from hvae_utils import read_expressions_json, load_config_file, create_batch
 from symbol_library import generate_symbol_library
 from model import HVAE
 from train import train_hvae
+from tree import Node
 
+
+def symbol_distance(s1, s2):
+    return int(s1 != s2)
 
 def one_fold(model, train, test, epochs, batch_size, verbose):
     train_hvae(model, train, epochs, batch_size, verbose)
@@ -20,7 +25,7 @@ def one_fold(model, train, test, epochs, batch_size, verbose):
         latent = model.encode(batch)[0]
         pts = model.decode(latent)
         for j in range(len(pts)):
-            total_distance.append(editdistance.eval(test[i*batch_size+j].to_list(notation="postfix"), pts[j].to_list(notation="postfix")))
+            total_distance.append(zss.simple_distance(test[i*batch_size+j], pts[j], get_label=Node.get_symbol, label_dist=symbol_distance))
     print(len(total_distance))
     return total_distance
 

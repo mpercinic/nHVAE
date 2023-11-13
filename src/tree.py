@@ -7,6 +7,8 @@ def is_float(element: any) -> bool:
     #If you expect None to be passed:
     if element is None:
         return False
+    elif element[0] == '+':
+        return False
     try:
         float(element)
         return True
@@ -47,6 +49,9 @@ class Node:
                 max_bf = bf
         return max_bf
 
+    def get_symbol(self):
+        return self.symbol
+
     @staticmethod
     def symbol_type(symbol):
         return Node._symbols[Node._s2c[symbol]]["type"].value
@@ -81,12 +86,11 @@ class Node:
             return expression + [self.symbol]
 
         elif notation == "infix":
-            # if is_float(self.symbol):
-                # return [self.symbol]
+            if is_float(self.symbol):
+                return [self.symbol]
             stype = Node.symbol_type(self.symbol)
             if stype == SymType.Var.value or stype == SymType.Const.value:
                 return [self.symbol]
-            # len(self.children) == 1 redundant?
             elif stype == SymType.Fun.value and len(self.children) == 1:
                 expression = self.children[0].to_list(notation)
                 if Node.symbol_precedence(self.symbol) > 0:
@@ -95,10 +99,7 @@ class Node:
                     if len(self.children[0]) > 1:
                         expression = ["("] + expression + [")"]
                     return expression + [self.symbol]
-            # elif stype == SymType.Fun.value:
-                # print(":" + self.symbol, self.children)
             elif stype == SymType.Operator.value:
-                # print(self.symbol, self.children)
                 expression = []
                 first = True
                 for t in self.children:
@@ -111,9 +112,6 @@ class Node:
                     first = False
                 return expression
             else:
-                '''print(self.symbol)
-                for c in self.children:
-                    print(c.symbol)'''
                 raise Exception("Invalid symbol type")
         else:
             raise Exception("Invalid notation selected. Use 'infix', 'prefix', 'postfix'.")
@@ -284,20 +282,15 @@ class BatchedNode():
 
         exprs = []
         for t in self.children:
-            exprs.append(t.get_expr_at_idx(idx))
+            t_expr = t.get_expr_at_idx(idx)
+            if t_expr is not None:
+                exprs.append(t.get_expr_at_idx(idx))
 
         return Node(symbol, children=exprs)
 
     @staticmethod
     def get_prediction(tree):
         reps = []
-
-        '''p = []
-        for i in range(len(BatchedNode._symbols)):
-            p += [(BatchedNode._symbols[i]["key"], i+1)]
-        print(p)
-        print(tree.symbols)
-        print(tree.prediction)'''
 
         target = tree.prediction[:, 0, :]
         reps.append(target[:, None, :])
