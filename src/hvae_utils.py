@@ -1,7 +1,7 @@
 import commentjson as cjson
 import json
 from symbol_library import SymType
-from tree import Node, BatchedNode
+from tree import Node, BatchedNode, is_float
 
 
 def read_expressions(filepath):
@@ -17,7 +17,7 @@ def read_expressions_json(filepath):
         return [Node.from_dict(d) for d in json.load(file)]
 
 
-def tokens_to_tree(tokens, symbols):
+def tokens_to_tree(tokens, symbols, max_arity):
     """
     tokens : list of string tokens
     symbols: dictionary of possible tokens -> attributes, each token must have attributes: nargs (0-2), order
@@ -31,7 +31,7 @@ def tokens_to_tree(tokens, symbols):
     for token in tokens:
         if token == "(":
             operator_stack.append(token)
-        elif token in symbols and (symbols[token]["type"].value == SymType.Var.value or symbols[token]["type"].value == SymType.Const.value):
+        elif token in symbols and (symbols[token]["type"].value == SymType.Var.value or symbols[token]["type"].value == SymType.Const.value) or is_float(token):
             out_stack.append(Node(token, children=[]))
         elif token in symbols and symbols[token]["type"].value == SymType.Fun.value:
             if token[0] == "^":
@@ -47,7 +47,8 @@ def tokens_to_tree(tokens, symbols):
                     out_stack.append(Node(operator_stack.pop(), children=[out_stack.pop()]))
                 else:
                     op_current = operator_stack[-1]
-                    if operator_stack[-1] == '*' and len(operator_stack) > 1 and operator_stack[-2] == op_current:
+                    if operator_stack[-1] == '*' and len(operator_stack) > 1 and operator_stack[-2] == op_current \
+                            and len(children) < max_arity - 2:
                         children.append(out_stack.pop())
                         operator_stack.pop()
                     else:
@@ -66,8 +67,8 @@ def tokens_to_tree(tokens, symbols):
                     out_stack.append(Node(operator_stack.pop(), children=[out_stack.pop()]))
                 else:
                     op_current = operator_stack[-1]
-                    if (operator_stack[-1] == '+' or operator_stack[-1] == '*') \
-                            and len(operator_stack) > 1 and operator_stack[-2] == op_current:
+                    if (operator_stack[-1] == '+' or operator_stack[-1] == '*') and len(operator_stack) > 1 \
+                            and operator_stack[-2] == op_current and len(children) < max_arity - 2:
                         children.append(out_stack.pop())
                         operator_stack.pop()
                     else:
@@ -99,11 +100,11 @@ def create_batch(trees):
     return t
 
 
-def expression_set_to_json(expressions, symbols, out_path):
+def expression_set_to_json(expressions, symbols, out_path, max_arity):
     dicts = []
     so = {s["symbol"]: s for s in symbols}
     for expr in expressions:
-        dicts.append(tokens_to_tree(expr, so).to_dict())
+        dicts.append(tokens_to_tree(expr, so, max_arity).to_dict())
 
     with open(out_path, "w") as file:
         json.dump(dicts, file)

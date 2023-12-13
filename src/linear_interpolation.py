@@ -43,14 +43,16 @@ if __name__ == '__main__':
     model = torch.load(training_config["param_path"])
 
     # Expressions we want to interpolate between
-    exprA = "cos ( A * A + A ) + exp ( A ) / A"
-    exprB = "A ^2 - A ^3"
+    #exprA = "cos ( A * A + A ) + exp ( A ) / A"
+    #exprB = "A ^2 - A ^3"
+    exprA = "( C * A ^ C + A ^ C ) / C + C"
+    exprB = "C - ( A ^ C ) / C"
     # Number of steps in the interpolation (inclusive with expressions A and B)
     steps = 5
 
     tokensA = exprA.split(" ")
     tokensB = exprB.split(" ")
-    treeA = tokens_to_tree(tokensA, so)
-    treeB = tokens_to_tree(tokensB, so)
+    treeA = tokens_to_tree(tokensA, so, expr_config["max_arity"])
+    treeB = tokens_to_tree(tokensB, so, expr_config["max_arity"])
 
     interpolateAB(model, treeA, treeB)

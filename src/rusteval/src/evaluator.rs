@@ -37,6 +37,12 @@ impl Evaluator {
                         stack.push(a);
                     }
                 }
+                "^" => {
+                    let b = stack.pop().ok_or(PyValueError::new_err("Exception during evaluation: Ran out of tokens in the stack."))?;
+                    let a = stack.pop().ok_or(PyValueError::new_err("Exception during evaluation: Ran out of tokens in the stack."))?;
+                    let c = a.iter().zip(b.iter()).map(|(&a, &b)| a.powf(b)).collect();
+                    stack.push(c);
+                }
                 "log" => {
                     let a = stack.pop().ok_or(PyValueError::new_err("Exception during evaluation: Ran out of tokens in the stack."))?;
                     let b = a.map(|v| v.ln());

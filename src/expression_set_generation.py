@@ -180,7 +180,7 @@ def tokens_to_tree(tokens, symbols, max_arity):
 
 
 def generate_expressions(grammar, number_of_expressions, number_of_all_expressions, symbols, max_arity, has_constants=True, max_depth=7):
-    generator = GeneratorGrammar(grammar)
+    #generator = GeneratorGrammar(grammar)
     expression_set = set()
     expressions = []
     expressions_final = []
@@ -188,13 +188,15 @@ def generate_expressions(grammar, number_of_expressions, number_of_all_expressio
         expressions.append([])
     #with open("../expressions.pkl", 'rb') as f:
     #    exprs = pickle.load(f)
-    with open("../expressions_c_equal.pkl", 'rb') as f:
-        exprs = pickle.load(f)
-    for expr in exprs:
+    #with open("../expressions_c_equal.pkl", 'rb') as f:
+    #    exprs = pickle.load(f)
+    exprs = open("../data/expressions_7_20k_trig.txt")
+    for expr in exprs.readlines():
+        expr = expr[:-1].split(" ")
         if len(expression_set) % 500 == 0:
             print(f"Unique expressions generated so far: {len(expression_set)}")
-        if has_constants:
-            pass
+        #if has_constants:
+        #    pass
 
         expr_str = "".join(expr)
 
@@ -204,6 +206,7 @@ def generate_expressions(grammar, number_of_expressions, number_of_all_expressio
             expression_set.add(expr_str)
         except:
             continue
+    exprs.close()
     '''while len(expression_set) < number_of_expressions:
         if len(expression_set) % 500 == 0:
             print(f"Unique expressions generated so far: {len(expression_set)}")
@@ -247,7 +250,7 @@ def generate_expressions(grammar, number_of_expressions, number_of_all_expressio
             if expr_str in expression_set:
                 continue
             max_bf = expr_tree.max_branching_factor()
-            if tree_height > max_depth or len(expr_tree.to_list()) > 32:  # or expr_length > max_length:
+            if tree_height > max_depth or len(expr_tree.to_list()) > 32: # not the same as expression length > 32  # or expr_length > max_length:
                 continue
 
             expressions[max_bf].append(expr_tree)
@@ -288,8 +291,8 @@ if __name__ == '__main__':
     # Optional (recommended): Generate training set from a custom grammar
     grammar = None
 
-    if grammar is None:
-        grammar = generate_grammar(sy_lib)
+    #if grammar is None:
+        #grammar = generate_grammar(sy_lib)
 
     # print(tokens_to_tree(["A", "+", "A", "+", "(", "A", "+", "A", ")"], so2, expr_config["max_arity"]).symbol)
 

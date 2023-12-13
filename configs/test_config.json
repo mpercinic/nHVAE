@@ -1,29 +1,31 @@
 {
   "expression_definition": {
-    // Single arity operations and functions that occur in expressions
-    "symbols": ["-", "/", "sin", "cos", "exp", "sqrt", "log", "^2", "^3", "^4", "^5"],
+    // Fixed arity operations and functions that occur in expressions
+    //"symbols": ["-", "/", "sin", "cos", "exp", "sqrt", "log", "^2", "^3", "^4", "^5"],
+    "symbols": ["-", "/", "^", "sin", "cos"],
     // Operators and functions that occur in expressions
-    "symbols2": ["+", "-", "*", "/", "sin", "cos", "exp", "sqrt", "log", "^2", "^3", "^4", "^5"],
+    //"symbols2": ["+", "-", "*", "/", "sin", "cos", "exp", "sqrt", "log", "^2", "^3", "^4", "^5"],
+    "symbols2": ["+", "-", "*", "/", "^", "sin", "cos"],
     // Number of variables that occur in expressions
     "num_variables": 1,
     // Maximum arity of operators that occur in expressions
     "max_arity": 5,
     // True if expressions also contain constant parameters, otherwise false
-    "has_constants": false
+    "has_constants": true
   },
   "expression_set_generation": {
     // Parameters for creating a new training set
     // Number of used expressions
-    "num_expressions": 40000,
+    "num_expressions": 15000,
     // Number of total generated expressions
-    "num_all_expressions": 40000,
+    "num_all_expressions": 15000,
     // Max height of the generated expression trees
-    "max_tree_height": 7,
+    "max_tree_height": 5,
     // Max length of the generated expression
     // "max_expression_length": 32,
     // Path where the generated expression set will be saved. If empty string, the expression set won't be saved
     // This path is also used in training and reconstruction script as input into the model
-    "expression_set_path": "../data/expression_sets/ng1_7_orig.json"
+    "expression_set_path": "../data/expression_sets/ptrees_5_15k.json"
   },
   "training": {
     // Number of epochs the model trains for
@@ -31,10 +33,10 @@
     "batch_size": 32,
     "verbose": true,
     // Dimensionality of the latent space
-    "latent_size": 32,
+    "latent_size": 128,
     "seed": 18,
     // Path where model parameters will be saved. If empty string, the parameters won't be saved
-    "param_path": "../params/ng1_7_orig.pt"
+    "param_path": "../params/ptrees_5_15k.pt"
   },
   "reconstruction": {
     // If smaller dataset is True, it will train the model with the specified number of expressions

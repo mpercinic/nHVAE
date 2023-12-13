@@ -167,12 +167,13 @@ def one_sr_run(config, baseline, re_train, seed):
                 "best_candidates": best_candidates}
 
 
-def check_on_test_set(results, re_test, so):
+def check_on_test_set(results, re_test, so, max_arity):
     best_test_error = 9e+50
     best_test_expression = ""
 
     for i in range(len(results["best_candidates"])):
-        tree = tokens_to_tree(results["best_candidates"][i]["expr"].split(" "), so)
+        #print(results["best_candidates"][i]["expr"].split(" "))
+        tree = tokens_to_tree(results["best_candidates"][i]["expr"].split(" "), so, max_arity)
         test_error = re_test.get_error(tree.to_list("postfix"), [results["best_candidates"][i]["constants"]])[0]
         results["best_candidates"][i]["test_error"] = test_error
         if test_error < best_test_error:
@@ -224,9 +225,9 @@ if __name__ == '__main__':
             results.append(one_sr_run(config, baseline, re_train, seed))
 
     test_set = read_eq_data(sr_config["test_set_path"])
-    re_test = RustEval(test_set, default_value=sr_config["default_error"])
+    re_test = RustEval(test_set, default_value=sr_config["default_error"])  # correct?
     for i in range(len(results)):
-        results[i] = check_on_test_set(results[i], re_test, so)
+        results[i] = check_on_test_set(results[i], re_test, so, expr_config["max_arity"])
 
     with open(sr_config["results_path"], "w") as file:
         json.dump(results, file)
