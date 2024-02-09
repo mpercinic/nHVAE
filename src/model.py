@@ -54,22 +54,13 @@ class Encoder(nn.Module):
         self.mu = nn.Linear(in_features=hidden_size, out_features=output_size)
         self.logvar = nn.Linear(in_features=hidden_size, out_features=output_size)
 
-        '''self.wms = []
-        for i in range(max_arity):
-            self.wms.append(nn.Linear(in_features=hidden_size, out_features=hidden_size))
-            torch.nn.init.xavier_uniform_(self.wms[i].weight)
-        self.w = nn.Linear(in_features=hidden_size, out_features=1)
-        self.w_a = nn.Linear(in_features=hidden_size, out_features=hidden_size)
-
-        torch.nn.init.xavier_uniform_(self.w.weight)
-        torch.nn.init.xavier_uniform_(self.w_a.weight)'''
-
         self.ms = []
         for i in range(max_arity):
             self.ms.append(nn.Linear(in_features=hidden_size, out_features=hidden_size))
             torch.nn.init.xavier_uniform_(self.ms[i].weight)
 
         self.l = nn.Linear(hidden_size, hidden_size)
+
         torch.nn.init.xavier_uniform_(self.l.weight)
 
         torch.nn.init.xavier_uniform_(self.mu.weight)
@@ -92,26 +83,10 @@ class Encoder(nn.Module):
             children.append(torch.zeros(tree.target.size(0), 1, self.hidden_size))
             child_sum = children[0]
         else:
-            '''ms = []
-            i = 0
-            for c in children:
-                ms.append(torch.tanh(self.wms[i](c)))
-                i += 1
-            ms2 = []
-            for m in ms:
-                ms2.append(self.w(m))
-            aks = []
-            ms_sum = sum(ms2)
-            for m in ms2:
-                aks.append(m / ms_sum)
-            g = torch.zeros(children[0].size())
-            for a, c in zip(aks, children):
-                g += a * c
-            child_sum = torch.tanh(self.w_a(g))'''
             child_sum = torch.zeros(children[0].size())
             i = 0
             for c in children:
-                child_sum = child_sum + self.ms[i](c)  # try just ms and add tanh
+                child_sum = child_sum + self.ms[i](c)
                 i += 1
 
         hidden = self.gru(tree.target, self.l(child_sum), children)
@@ -123,30 +98,140 @@ class Decoder(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super(Decoder, self).__init__()
         self.hidden_size = hidden_size
-        #self.z2h = nn.Linear(input_size, hidden_size)
         self.h2o = nn.Linear(hidden_size, output_size)
-        #self.gru_ancestral = GRUAncestral(input_size=output_size, hidden_size=hidden_size)
-        self.gru_fraternal = GRUFraternal(input_size=output_size, hidden_size=hidden_size)
-        self.u_a = nn.Linear(hidden_size, hidden_size)
-        self.u_f = nn.Linear(hidden_size, hidden_size)
+        self.gru_a = GRUAncestral(input_size=output_size, hidden_size=hidden_size)
+        self.gru_f = GRUFraternal(input_size=output_size, hidden_size=hidden_size)
 
-        #self.f_init = nn.Linear(hidden_size, hidden_size)
-        self.a = nn.Linear(hidden_size, hidden_size)
+        self.z2h = nn.Linear(input_size, hidden_size)
         self.h = nn.Linear(hidden_size, hidden_size)
 
-        #torch.nn.init.xavier_uniform_(self.z2h.weight)
-        torch.nn.init.xavier_uniform_(self.h2o.weight)
-        torch.nn.init.xavier_uniform_(self.u_a.weight)
-        torch.nn.init.xavier_uniform_(self.u_f.weight)
+        #self.z2h1 = nn.Linear(input_size, hidden_size)
+        #self.z2h2 = nn.Linear(input_size, hidden_size)
 
-        #torch.nn.init.xavier_uniform_(self.f_init.weight)
-        torch.nn.init.xavier_uniform_(self.a.weight)
+        torch.nn.init.xavier_uniform_(self.h2o.weight)
+        #torch.nn.init.xavier_uniform_(self.z2h.weight)
+
+        torch.nn.init.xavier_uniform_(self.z2h.weight)
         torch.nn.init.xavier_uniform_(self.h.weight)
+
+        #torch.nn.init.xavier_uniform_(self.z2h1.weight)
+        #torch.nn.init.xavier_uniform_(self.z2h2.weight)
 
     # Used during training to guide the learning process
     def forward(self, z, tree):
-        hidden = z  # only works if hidden_size = output_size for the HVAE (i.e. hidden_size = input_size for the Decoder)
-        self.recursive_forward(self.a(hidden), self.h(hidden), tree)
+        hidden = self.z2h(z)
+        self.recursive_forward(hidden, tree)
+        return tree
+
+    def recursive_forward(self, hidden_a, tree):
+        prediction = self.h2o(hidden_a)
+        symbol_probs = F.softmax(prediction, dim=2)
+
+        tree.prediction = prediction
+
+        first = True
+        for t in tree.children:
+            if t is not None:
+                if first:
+                    hidden_f, symbol_probs_f = self.recursive_forward(self.h(hidden_a), t)
+                else:
+                    hidden_f = self.gru_f(symbol_probs_f, hidden_f)
+                    hidden = hidden_f + self.gru_a(symbol_probs, hidden_a)
+                    hidden_f, symbol_probs_f = self.recursive_forward(self.h(hidden), t)
+                first = False
+
+        return hidden_a, symbol_probs
+
+    # Used for inference to generate expression trees from latent vectors
+    def decode(self, z, symbol_dict):
+        with torch.no_grad():
+            mask = torch.ones(z.size(0)).bool()
+            hidden = self.z2h(z)
+            batch, _, _ = self.recursive_decode(hidden, symbol_dict, mask)
+            return batch.to_expr_list()
+
+    def recursive_decode(self, hidden_a, symbol_dict, mask):
+        prediction = F.softmax(self.h2o(hidden_a), dim=2)
+        # Sample symbol in a given node
+        symbols, child_mask = self.sample_symbol(prediction, symbol_dict, mask)
+
+        first = True
+        children = []
+        for i in range(child_mask.size(0)):
+            if first:
+                if torch.any(child_mask[i]):
+                    child, hidden_f, prediction_f = self.recursive_decode(self.h(hidden_a), symbol_dict, child_mask[i])
+                    children.append(child)
+            elif torch.any(child_mask[i]):
+                hidden_f = self.gru_f(prediction_f, hidden_f)
+                hidden = hidden_f + self.gru_a(prediction, hidden_a)
+                child, hidden_f, prediction_f = self.recursive_decode(self.h(hidden), symbol_dict, child_mask[i])
+                children.append(child)
+            first = False
+
+        node = BatchedNode()
+        node.symbols = symbols
+        node.children = children
+        return node, hidden_a, prediction
+
+    def sample_symbol(self, prediction, symbol_dict, mask):
+        sampled = F.softmax(prediction, dim=2)
+        # Select the symbol with the highest value ("probability")
+        symbols = []
+
+        for i in range(sampled.size(0)):
+            if mask[i]:
+                symbol = symbol_dict[torch.argmax(sampled[i, 0, :])]
+                symbols.append(symbol["key"])
+            else:
+                symbols.append("")
+
+        max_arity = 0
+        for s in symbols:
+            if s != "":
+                symbol = next(d for d in symbol_dict if d["key"] == s)
+                if symbol["arity"] > max_arity:
+                    max_arity = symbol["arity"]
+
+        child_mask = torch.empty([max_arity, mask.size(0)])
+        for i in range(max_arity):
+            ith_mask = torch.clone(mask)
+            for j in range(ith_mask.size(0)):
+                if symbols[j] != "":
+                    symbol = next(d for d in symbol_dict if d["key"] == symbols[j])
+                    if symbol["arity"] <= i:
+                        ith_mask[j] = False
+            child_mask[i] = ith_mask
+
+        return symbols, child_mask
+
+
+'''class Decoder(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super(Decoder, self).__init__()
+        self.hidden_size = hidden_size
+        self.h2o = nn.Linear(hidden_size, output_size)
+        self.gru_a = GRUAncestral(input_size=output_size, hidden_size=hidden_size)
+        self.gru_f = GRUFraternal(input_size=output_size, hidden_size=hidden_size)
+
+        self.a = nn.Linear(input_size, hidden_size)
+        self.h = nn.Linear(hidden_size, hidden_size)
+
+        self.z2h1 = nn.Linear(input_size, hidden_size)
+        self.z2h2 = nn.Linear(input_size, hidden_size)
+
+        torch.nn.init.xavier_uniform_(self.h2o.weight)
+        #torch.nn.init.xavier_uniform_(self.z2h.weight)
+
+        torch.nn.init.xavier_uniform_(self.a.weight)
+        torch.nn.init.xavier_uniform_(self.h.weight)
+        torch.nn.init.xavier_uniform_(self.z2h1.weight)
+        torch.nn.init.xavier_uniform_(self.z2h2.weight)
+
+    # Used during training to guide the learning process
+    def forward(self, z, tree):
+        hidden = z
+        self.recursive_forward(self.z2h1(hidden), self.z2h2(hidden), tree)
         return tree
 
     def recursive_forward(self, hidden_a, hidden, tree):
@@ -157,44 +242,25 @@ class Decoder(nn.Module):
 
         hidden_final = hidden
 
-        #symbol_probs_a = F.softmax(self.h2o(hidden_a), dim=2)
-        '''hidden_a_i = self.gru_ancestral(symbol_probs, hidden_a)
-        first = True
-        for t in tree.children:
-            if t is not None:
-                if first:
-                    symbol_probs_f = self.recursive_forward(self.a(hidden_a_i), self.h(hidden_a_i), t)
-                    hidden_f = self.f_init(hidden)
-                else:
-                    hidden_f = self.gru_fraternal(symbol_probs_f, hidden_f)
-                    #hidden = torch.tanh(self.u_f(hidden_f) + self.u_a(hidden_a_i))
-                    hidden = hidden_f + hidden_a_i
-                    #hidden = self.gru(symbol_probs, hidden_a_i, hidden_f)
-                    symbol_probs_f = self.recursive_forward(self.a(hidden_a_i), self.h(hidden), t)
-                first = False'''
-
         first = True
         for t in tree.children:
             if t is not None:
                 if first:
                     hidden_f, symbol_probs_f = self.recursive_forward(self.a(hidden_a), self.h(hidden), t)
-                    #hidden_f = self.f_init(hidden)
                 else:
-                    hidden_f = self.gru_fraternal(symbol_probs_f, hidden_f)
-                    hidden = self.u_f(hidden_f) + self.u_a(self.a(hidden_a))
-                    #hidden = hidden_f + hidden_a
-                    #hidden = self.gru(symbol_probs, hidden_a, hidden_f)
+                    hidden_f = self.gru_f(symbol_probs_f, hidden_f)
+                    hidden = hidden_f + self.gru_a(symbol_probs, hidden_a)
                     hidden_f, symbol_probs_f = self.recursive_forward(self.a(hidden_a), self.h(hidden), t)
                 first = False
 
         return hidden_final, symbol_probs
 
-    # Used for inference to generate expression trees from latent vectorS
+    # Used for inference to generate expression trees from latent vectors
     def decode(self, z, symbol_dict):
         with torch.no_grad():
             mask = torch.ones(z.size(0)).bool()
             hidden = z
-            batch, _, _ = self.recursive_decode(self.a(hidden), self.h(hidden), symbol_dict, mask)
+            batch, _, _ = self.recursive_decode(self.z2h1(hidden), self.z2h2(hidden), symbol_dict, mask)
             return batch.to_expr_list()
 
     def recursive_decode(self, hidden_a, hidden, symbol_dict, mask):
@@ -204,41 +270,17 @@ class Decoder(nn.Module):
 
         hidden_final = hidden
 
-        '''first = True
-        #prediction_a = F.softmax(self.h2o(hidden_a), dim=2)
-        hidden_a_i = self.gru_ancestral(prediction, hidden_a)
-        children = []
-        for i in range(child_mask.size(0)):
-            if first:
-                hidden_f = self.f_init(hidden)
-                if torch.any(child_mask[i]):
-                    child, prediction_f = self.recursive_decode(self.a(hidden_a_i), self.h(hidden_a_i), symbol_dict, child_mask[i])
-                    children.append(child)
-            elif torch.any(child_mask[i]):
-                hidden_f = self.gru_fraternal(prediction_f, hidden_f)
-                #hidden = torch.tanh(self.u_f(hidden_f) + self.u_a(hidden_a_i))
-                hidden = hidden_f + hidden_a_i
-                #hidden = self.gru(prediction, hidden_a_i, hidden_f)
-                child, prediction_f = self.recursive_decode(self.a(hidden_a_i), self.h(hidden), symbol_dict, child_mask[i])
-                children.append(child)
-            first = False'''
-
         first = True
-        # prediction_a = F.softmax(self.h2o(hidden_a), dim=2)
         children = []
-        #print(symbols)
         for i in range(child_mask.size(0)):
             if first:
-                #hidden_f = self.f_init(hidden)
                 if torch.any(child_mask[i]):
                     child, hidden_f, prediction_f = self.recursive_decode(self.a(hidden_a), self.h(hidden), symbol_dict,
                                                                 child_mask[i])
                     children.append(child)
             elif torch.any(child_mask[i]):
-                hidden_f = self.gru_fraternal(prediction_f, hidden_f)
-                hidden = self.u_f(hidden_f) + self.u_a(self.a(hidden_a))  # try adding self.a and removing tanh
-                #hidden = hidden_f + hidden_a
-                #hidden = self.gru(prediction, hidden_a, hidden_f)
+                hidden_f = self.gru_f(prediction_f, hidden_f)
+                hidden = hidden_f + self.gru_a(prediction, hidden_a)
                 child, hidden_f, prediction_f = self.recursive_decode(self.a(hidden_a), self.h(hidden), symbol_dict,
                                                             child_mask[i])
                 children.append(child)
@@ -278,7 +320,7 @@ class Decoder(nn.Module):
                         ith_mask[j] = False
             child_mask[i] = ith_mask
 
-        return symbols, child_mask
+        return symbols, child_mask'''
 
 
 class GRU_N21(nn.Module):
@@ -288,8 +330,8 @@ class GRU_N21(nn.Module):
         self.whr = nn.Linear(in_features=hidden_size, out_features=hidden_size)
         self.wiz = nn.Linear(in_features=input_size, out_features=hidden_size)
         self.whz = nn.Linear(in_features=hidden_size, out_features=hidden_size)
-        self.win = nn.Linear(in_features=input_size, out_features=hidden_size)
-        self.whn = nn.Linear(in_features=hidden_size, out_features=hidden_size)
+        self.win = nn.Linear(in_features=input_size, out_features=hidden_size, bias=False)
+        self.whn = nn.Linear(in_features=hidden_size, out_features=hidden_size, bias=False)
 
         torch.nn.init.xavier_uniform_(self.wir.weight)
         torch.nn.init.xavier_uniform_(self.whr.weight)

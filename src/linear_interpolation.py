@@ -43,10 +43,29 @@ if __name__ == '__main__':
     model = torch.load(training_config["param_path"])
 
     # Expressions we want to interpolate between
-    #exprA = "cos ( A * A + A ) + exp ( A ) / A"
-    #exprB = "A ^2 - A ^3"
-    exprA = "( C * A ^ C + A ^ C ) / C + C"
-    exprB = "C - ( A ^ C ) / C"
+    # AE4-2k examples
+    #exprA = "C * ( A + C ) + A ^ C / C"
+    #exprB = "C - A + ( A + C ) / C"
+    #exprA = "C - A * C + A"
+    #exprB = "( C + C * A ) / C"
+
+    # AE7-20k examples
+    #exprA = "( C * A ^ C + A ^ C ) / C + C"
+    #exprB = "C - A ^ C / C"
+    #exprA = "C * A / ( C - A ) + C - A + C"
+    #exprB = "C * A ^ C / ( C + A ) + A"
+    exprA = "C * A * ( C * A + C - A ) + A"
+    #exprB = "C * ( C * A - C - A + C )"
+    exprB = "C * ( C * A + C - A )"
+
+    # Trig5-15k examples
+    #exprA = "C + sin ( C ) + sin ( A ) / A - A / C"
+    #exprB = "A ^ C - A * sin ( C )"
+    #exprA = "A ^ C * cos ( C ) + A"
+    #exprB = "C + cos ( A ^ C / C )"
+    #exprA = "C * cos ( C ) + C / A + A / sin ( A )"
+    #exprB = "sin ( A - C ) / A"
+
     # Number of steps in the interpolation (inclusive with expressions A and B)
     steps = 5
 

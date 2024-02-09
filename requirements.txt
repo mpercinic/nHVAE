@@ -1,7 +1,7 @@
 numpy
 torch
 rustimport
-zss
+editdistance
 scikit-learn
 tqdm
 commentjson

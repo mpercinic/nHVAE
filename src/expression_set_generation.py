@@ -179,7 +179,7 @@ def tokens_to_tree(tokens, symbols, max_arity):
     return out_stack[-1]
 
 
-def generate_expressions(grammar, number_of_expressions, number_of_all_expressions, symbols, max_arity, has_constants=True, max_depth=7):
+def generate_expressions(grammar, number_of_all_expressions, symbols, max_arity, max_depth=7):
     #generator = GeneratorGrammar(grammar)
     expression_set = set()
     expressions = []
@@ -211,8 +211,6 @@ def generate_expressions(grammar, number_of_expressions, number_of_all_expressio
         if len(expression_set) % 500 == 0:
             print(f"Unique expressions generated so far: {len(expression_set)}")
         expr = generator.generate_one()[0]
-        if has_constants:
-            pass
 
         expr_str = "".join(expr)
         if expr_str in expression_set:
@@ -235,9 +233,6 @@ def generate_expressions(grammar, number_of_expressions, number_of_all_expressio
         if len(expression_set) % 500 == 0:
             print(f"Unique expressions generated so far: {len(expression_set)}")
         expr = generator.generate_one()[0]
-        if has_constants:
-            pass
-
 
         try:
             expr_tree = tokens_to_tree(expr, symbols, max_arity)
@@ -296,8 +291,7 @@ if __name__ == '__main__':
 
     # print(tokens_to_tree(["A", "+", "A", "+", "(", "A", "+", "A", ")"], so2, expr_config["max_arity"]).symbol)
 
-    expressions = generate_expressions(grammar, es_config["num_expressions"], es_config["num_all_expressions"],
-                                       so2, expr_config["max_arity"], expr_config["has_constants"],
+    expressions = generate_expressions(grammar, es_config["num_expressions"], so2, expr_config["max_arity"],
                                        max_depth=es_config["max_tree_height"])
     print(len(expressions))
 

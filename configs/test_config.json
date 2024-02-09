@@ -1,9 +1,9 @@
 {
   "expression_definition": {
-    // Fixed arity operations and functions that occur in expressions
+    // Fixed arity operators and functions that occur in expressions
     //"symbols": ["-", "/", "sin", "cos", "exp", "sqrt", "log", "^2", "^3", "^4", "^5"],
     "symbols": ["-", "/", "^", "sin", "cos"],
-    // Operators and functions that occur in expressions
+    // All operators and functions that occur in expressions
     //"symbols2": ["+", "-", "*", "/", "sin", "cos", "exp", "sqrt", "log", "^2", "^3", "^4", "^5"],
     "symbols2": ["+", "-", "*", "/", "^", "sin", "cos"],
     // Number of variables that occur in expressions
@@ -15,17 +15,15 @@
   },
   "expression_set_generation": {
     // Parameters for creating a new training set
-    // Number of used expressions
-    "num_expressions": 15000,
-    // Number of total generated expressions
-    "num_all_expressions": 15000,
+    // Number of generated expressions
+    "num_expressions": 20000,
     // Max height of the generated expression trees
-    "max_tree_height": 5,
+    "max_tree_height": 7,
     // Max length of the generated expression
     // "max_expression_length": 32,
     // Path where the generated expression set will be saved. If empty string, the expression set won't be saved
     // This path is also used in training and reconstruction script as input into the model
-    "expression_set_path": "../data/expression_sets/ptrees_5_15k.json"
+    "expression_set_path": "../data/expression_sets/ptrees_7_20k_trig.json"
   },
   "training": {
     // Number of epochs the model trains for
@@ -36,12 +34,12 @@
     "latent_size": 128,
     "seed": 18,
     // Path where model parameters will be saved. If empty string, the parameters won't be saved
-    "param_path": "../params/ptrees_5_15k.pt"
+    "param_path": "../params/ptrees_7_20k_trig.pt"
   },
   "reconstruction": {
     // If smaller dataset is True, it will train the model with the specified number of expressions
-    "smaller_dataset": true,
-    "num_examples": 10000,
+    "smaller_dataset": false,
+    "num_examples": 6000,
     // Number of folds for the K-Fold cross-validation
     "n_folds": 5,
     // Path where results of the evaluation will be saved

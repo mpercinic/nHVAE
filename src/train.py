@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 
+import editdistance
 import numpy as np
 import torch
 from torch.utils.data import Sampler, Dataset
@@ -62,6 +63,7 @@ def train_hvae(model, trees, epochs=20, batch_size=32, verbose=True):
     iter_counter = 0
     total_iters = epochs*(len(dataset)//batch_size)
     lmbda = logistic_function(iter_counter, total_iters)
+    #lmbda = (np.tanh(-4.5) + 1) / 2
 
     midpoint = len(dataset) // (2 * batch_size)
 
@@ -93,14 +95,17 @@ def train_hvae(model, trees, epochs=20, batch_size=32, verbose=True):
 
                 lmbda = logistic_function(iter_counter, total_iters)
                 iter_counter += 1
+                #if iter_counter < 2500:
+                #    lmbda = (np.tanh((iter_counter - 4500) / 1000) + 1) / 2
 
                 if verbose and i == midpoint:
                     original_trees = batch.to_expr_list()
                     z = model.encode(batch)[0]
                     decoded_trees = model.decode(z)
                     for i in range(len(decoded_trees)):
-                        editdist = zss.simple_distance(original_trees[i], decoded_trees[i],
-                                                       get_label=Node.get_symbol, label_dist=symbol_distance)
+                        #editdist = zss.simple_distance(original_trees[i], decoded_trees[i],
+                        #                               get_label=Node.get_symbol, label_dist=symbol_distance)
+                        editdist = editdistance.eval(original_trees[i].to_list("postfix"), decoded_trees[i].to_list("postfix"))
                         if i == 0:
                             print()
                             # print(original_trees[i].to_pexpr())

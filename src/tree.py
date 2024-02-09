@@ -189,7 +189,7 @@ class Node:
         Node._s2c = {s["key"]: i for i, s in enumerate(symbols)}
 
 
-class BatchedNode():
+class BatchedNode:
     _symbols = None
     _s2c = None
 
