@@ -33,7 +33,7 @@ class SRProblem(Problem):
         self.model = model
         self.default_value = default_value
         self.eval_object = eval_object
-        self.input_mean = torch.zeros(next(model.decoder.parameters()).size(0))
+        self.input_mean = torch.zeros(next(model.decoder.parameters()).size(1))
         self.best_f = 9e+50
         self.best_expr = None
         self.models = dict()
@@ -47,9 +47,10 @@ class SRProblem(Problem):
             error = self.eval_expression(tree)
             errors.append(error)
 
-        out["F"] = np.array(errors)
+        out["F"] = np.array(errors, dtype="object")
 
     def eval_expression(self, tree):
+        #print(self.best_expr)
         expr_postfix = tree.to_list(notation="postfix")
         expr_postfix_str = "".join(expr_postfix)
         if expr_postfix_str in self.models:
@@ -133,7 +134,7 @@ def one_sr_run(config, baseline, re_train, seed):
                 "best_candidates": best_candidates}
 
     elif baseline == "HVAR":
-        gaussian_distribution_mean = torch.zeros(next(model.decoder.parameters()).size(0))
+        gaussian_distribution_mean = torch.zeros(next(model.decoder.parameters()).size(1))
         best_f = 9e+50
         best_expr = ""
         models = {}
@@ -167,9 +168,11 @@ def one_sr_run(config, baseline, re_train, seed):
                 "best_candidates": best_candidates}
 
 
-def check_on_test_set(results, re_test, so, max_arity):
+def check_on_test_set(test_set, results, re_test, so, max_arity):
     best_test_error = 9e+50
     best_test_expression = ""
+    best_test_expression_postfix = ""
+    best_test_index = -1
 
     for i in range(len(results["best_candidates"])):
         #print(results["best_candidates"][i]["expr"].split(" "))
@@ -178,10 +181,17 @@ def check_on_test_set(results, re_test, so, max_arity):
         results["best_candidates"][i]["test_error"] = test_error
         if test_error < best_test_error:
             best_test_error = test_error
+            best_test_expression_postfix = tree.to_list("postfix")
+            best_test_index = i
             best_test_expression = str(tree)
 
+    test_eval = np.array(re_test.evaluate(best_test_expression_postfix, [results["best_candidates"][best_test_index]["constants"]])[0])
+    numerator = np.sum(np.square(test_set - test_eval))
+    denominator = np.sum(np.square(test_set - np.mean(test_set)))
+    best_test_r2 = max(0.0, 1 - numerator / denominator)
+
     test_best = {}
-    test_best["best_error"] = best_test_error
+    test_best["best_r2"] = best_test_r2
     test_best["best_expr"] = best_test_expression
     results["test"] = test_best
     return results
@@ -225,9 +235,19 @@ if __name__ == '__main__':
             results.append(one_sr_run(config, baseline, re_train, seed))
 
     test_set = read_eq_data(sr_config["test_set_path"])
-    re_test = RustEval(test_set, default_value=sr_config["default_error"])  # correct?
+    re_test = RustEval(test_set, default_value=sr_config["default_error"])
+
+    evaluated = []
+    r2 = []
     for i in range(len(results)):
-        results[i] = check_on_test_set(results[i], re_test, so, expr_config["max_arity"])
+        results[i] = check_on_test_set(np.array(test_set[:, 1]), results[i], re_test, so, expr_config["max_arity"])
+        evaluated.append(results[i]["all_evaluated"])
+        r2.append(results[i]["test"]["best_r2"])
+        print(results[i]["train"]["best_expr"], results[i]["test"]["best_r2"], results[i]["train"]["best_error"])
+    evaluated = np.array(evaluated)
+    r2 = np.array(r2)
+    print(np.mean(r2), np.std(r2))
+    print(np.mean(evaluated), np.std(evaluated))
 
     with open(sr_config["results_path"], "w") as file:
         json.dump(results, file)

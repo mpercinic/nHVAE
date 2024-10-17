@@ -12,7 +12,7 @@ from model import HVAE
 from symbol_library import generate_symbol_library
 from tree import Node
 
-import zss
+# import zss
 
 
 def collate_fn(batch):
@@ -94,9 +94,9 @@ def train_hvae(model, trees, epochs=20, batch_size=32, verbose=True):
                 prog_bar.update(batch_size)
 
                 lmbda = logistic_function(iter_counter, total_iters)
-                iter_counter += 1
                 #if iter_counter < 2500:
                 #    lmbda = (np.tanh((iter_counter - 4500) / 1000) + 1) / 2
+                iter_counter += 1
 
                 if verbose and i == midpoint:
                     original_trees = batch.to_expr_list()

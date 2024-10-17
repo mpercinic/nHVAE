@@ -55,7 +55,7 @@ def DE_pymoo(model, constants, evaluator, **estimation_settings):
     output = minimize(pymoo_problem,
                       algorithm,
                       termination,
-                      verbose=True,
+                      verbose=False,
                       save_history=False)
 
     return output.X, output.F
@@ -87,7 +87,7 @@ class RustEval:
         if constants is None:
             constants = []
         try:
-            return self.evaluator.eval_expr(expression, constants)
+            return self.evaluator.eval_expr(expression, constants, False)
         except Exception as e:
             if self.verbose:
                 print(e)
@@ -124,12 +124,6 @@ class RustEval:
 
 if __name__ == '__main__':
     data = read_eq_data("../data/nguyen/nguyen10_test.csv")
-    #data = np.array([[1., 2., 3., 4.], [2., 3., 4., 5.]]).T
     data = np.array([[1., 2., 3., 4.], [3., 6., 29., 258.]]).T
     rev = RustEval(data)
-    #print(rev.fit_and_evaluate(["A", "1", "/", "C", "+"]))
-    #print(rev.fit_and_evaluate(["A", "A", "A", "*3", "C", "+2"]))
     print(rev.fit_and_evaluate(["A", "A", "^", "C", "+2"]))
-# names = ["X", "Y"]
-# evaluator = Evaluator(data, names)
-# print(evaluator.eval_expr(["X", "Y", "+"]))

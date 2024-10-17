@@ -16,14 +16,14 @@
   "expression_set_generation": {
     // Parameters for creating a new training set
     // Number of generated expressions
-    "num_expressions": 20000,
+    "num_expressions": 15000,
     // Max height of the generated expression trees
-    "max_tree_height": 7,
+    "max_tree_height": 5,
     // Max length of the generated expression
     // "max_expression_length": 32,
     // Path where the generated expression set will be saved. If empty string, the expression set won't be saved
     // This path is also used in training and reconstruction script as input into the model
-    "expression_set_path": "../data/expression_sets/ptrees_7_20k_trig.json"
+    "expression_set_path": "../data/expression_sets/trig15k_newgrammar.json"
   },
   "training": {
     // Number of epochs the model trains for
@@ -34,7 +34,7 @@
     "latent_size": 128,
     "seed": 18,
     // Path where model parameters will be saved. If empty string, the parameters won't be saved
-    "param_path": "../params/ptrees_7_20k_trig.pt"
+    "param_path": "../params/ng/ng32/trig15k_newgrammar_complex.pt"
   },
   "reconstruction": {
     // If smaller dataset is True, it will train the model with the specified number of expressions
@@ -57,14 +57,14 @@
     // RMSE when an error occurs during the evaluation of an expression (e.g. division by zero)
     "default_error": 1e10,
     // Path to the tabular data for symbolic regression -> train set
-    "train_set_path": "../data/nguyen/nguyen4_train.csv",
+    "train_set_path": "../data/nguyen/nguyen6_train.csv",
     // Path to the tabular data for symbolic regression -> test set (not relevant yet)
-    "test_set_path": "../data/nguyen/nguyen4_test.csv",
+    "test_set_path": "../data/nguyen/nguyen6_test.csv",
     // Threshold for the highest RMSE allowed, so that an equation is deemed to be successful (typically ~ 1e-7 for
     // expressions without constants and ~ 1e-4 for expressions with constant parameters)
     "success_threshold": 1e-5,
     // Path to the file where results will be saved
-    "results_path": "../results/ng4_edhie.json",
+    "results_path": "../results/nguyen/ng6_edhie_oldgrammar_simple.json",
     "seed": 18,
     // Number of times each baseline will be ran
     "number_of_runs": 10,

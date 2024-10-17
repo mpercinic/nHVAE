@@ -7,18 +7,20 @@ from hvae_utils import tokens_to_tree, load_config_file, create_batch
 from symbol_library import generate_symbol_library
 
 
-def interpolateAB(model, treeA, treeB, steps=5):
+def interpolateAB(model, treeA, treeB, steps):
     treeBA = create_batch([treeA])
     treeBB = create_batch([treeB])
     l1 = model.encode(treeBA)[0]
     l2 = model.encode(treeBB)[0]
     print(f"Expr A:\t{str(treeA)}")
+    print()
     print(f"a=0:\t{str(model.decode(l1)[0])}")
     for i in range(1, steps-1):
         a = i/(steps-1)
         la = (1-a) * l1 + a * l2
         print(f"a={str(a)[:5]}:\t{str(model.decode(la)[0])}")
     print(f"a=1:\t{str(model.decode(l2)[0])}")
+    print()
     print(f"Expr B:\t{str(treeB)}")
 
 
@@ -43,28 +45,24 @@ if __name__ == '__main__':
     model = torch.load(training_config["param_path"])
 
     # Expressions we want to interpolate between
-    # AE4-2k examples
-    #exprA = "C * ( A + C ) + A ^ C / C"
-    #exprB = "C - A + ( A + C ) / C"
-    #exprA = "C - A * C + A"
-    #exprB = "( C + C * A ) / C"
+    #exprA = "cos ( A ) / C - C ^ ( A / C )"
+    #exprB = "( sin ( C ) - C ) ^ ( A * C * cos ( C ) ) + C"
 
-    # AE7-20k examples
-    #exprA = "( C * A ^ C + A ^ C ) / C + C"
-    #exprB = "C - A ^ C / C"
-    #exprA = "C * A / ( C - A ) + C - A + C"
-    #exprB = "C * A ^ C / ( C + A ) + A"
-    exprA = "C * A * ( C * A + C - A ) + A"
-    #exprB = "C * ( C * A - C - A + C )"
-    exprB = "C * ( C * A + C - A )"
+    exprA = "C * C * A * A / C ^ A"
+    #exprA = "sin ( A ) * sin ( C ) * A / C"
 
-    # Trig5-15k examples
-    #exprA = "C + sin ( C ) + sin ( A ) / A - A / C"
-    #exprB = "A ^ C - A * sin ( C )"
-    #exprA = "A ^ C * cos ( C ) + A"
-    #exprB = "C + cos ( A ^ C / C )"
-    #exprA = "C * cos ( C ) + C / A + A / sin ( A )"
-    #exprB = "sin ( A - C ) / A"
+    #exprA = "cos ( C ^ ( cos ( A ) * A * C ) ) / A"
+    #exprB = "sin ( A - C + A ) + C + A + C"
+
+
+    exprB = "sin ( A / C * cos ( A ) )"
+
+    #exprB = "cos ( C ) / C * sin ( C ) * C * C"
+    #exprA = "C * sin ( A / C ) * C * C * A"
+    #exprB = "A + cos ( C ) + C - cos ( A / C + A )"
+
+    #exprA = "A + C - cos ( cos ( A ) ) ^ C"
+    #exprB = "C / ( sin ( A ) + A ) ^ C"
 
     # Number of steps in the interpolation (inclusive with expressions A and B)
     steps = 5
@@ -74,4 +72,4 @@ if __name__ == '__main__':
     treeA = tokens_to_tree(tokensA, so, expr_config["max_arity"])
     treeB = tokens_to_tree(tokensB, so, expr_config["max_arity"])
 
-    interpolateAB(model, treeA, treeB)
+    interpolateAB(model, treeA, treeB, steps)

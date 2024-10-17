@@ -94,7 +94,7 @@ class Encoder(nn.Module):
         return hidden
 
 
-class Decoder(nn.Module):
+'''class Decoder(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super(Decoder, self).__init__()
         self.hidden_size = hidden_size
@@ -203,10 +203,10 @@ class Decoder(nn.Module):
                         ith_mask[j] = False
             child_mask[i] = ith_mask
 
-        return symbols, child_mask
+        return symbols, child_mask'''
 
 
-'''class Decoder(nn.Module):
+class Decoder(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super(Decoder, self).__init__()
         self.hidden_size = hidden_size
@@ -320,7 +320,7 @@ class Decoder(nn.Module):
                         ith_mask[j] = False
             child_mask[i] = ith_mask
 
-        return symbols, child_mask'''
+        return symbols, child_mask
 
 
 class GRU_N21(nn.Module):
@@ -350,6 +350,23 @@ class GRU_N21(nn.Module):
             s += r * h
         n = torch.tanh(self.win(x) + self.whn(s))
         return (1 - z) * n + z * h_sum
+
+    '''rs = []
+        zs = []
+        for h in hs:
+            rs.append(torch.sigmoid(self.wir(x) + self.whr(h)))
+            zs.append(torch.sigmoid(self.wiz(x) + self.whz(h)) / len(hs))
+        #z = torch.sigmoid(self.wiz(x) + self.whz(h_sum))
+        s = torch.zeros(hs[0].size())
+        for r, h in zip(rs, hs):
+            s += r * h
+        n = torch.tanh(self.win(x) + self.whn(s))
+        z = torch.zeros(zs[0].size())
+        z_sum = torch.zeros(zs[0].size())
+        for z_i, h in zip(zs, hs):
+            z = z + z_i
+            z_sum = z_sum + z_i * h
+        return (1 - z) * n + z_sum'''
 
 
 class GRUAncestral(nn.Module):

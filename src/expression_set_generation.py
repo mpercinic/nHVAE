@@ -2,14 +2,15 @@ from argparse import ArgumentParser
 import json
 
 import numpy as np
-import torch
-from ProGED.generators import GeneratorGrammar
+from ProGED.generators.grammar import GeneratorGrammar
 
 from tree import Node
-from hvae_utils import load_config_file
+from hvae_utils import load_config_file, read_expressions_json
 from symbol_library import generate_symbol_library, SymType
 
 import pickle
+import editdistance
+import zss
 
 
 def generate_grammar(symbols):
@@ -40,12 +41,17 @@ def generate_grammar(symbols):
         '''op_prob = 0.4 / len(operators[0])
         for op in operators[0]:
             grammar += f"E -> E '{op}' F [{op_prob}]\n"'''
-        grammar += "E -> E '-' F [0.08]\n"
-        grammar += "E -> E '+' F [0.2]\n"
-        grammar += "E -> E '+' F '+' F [0.08]\n"
-        grammar += "E -> E '+' F '+' F '+' F [0.03]\n"
+        # new grammar
+        grammar += "E -> E '-' F [0.1]\n"
+        grammar += "E -> E '+' F [0.04]\n"
+        grammar += "E -> E '+' F '+' F [0.03]\n"
+        grammar += "E -> E '+' F '+' F '+' F [0.02]\n"
         grammar += "E -> E '+' F '+' F '+' F '+' F [0.01]\n"
-        grammar += "E -> F [0.6]\n"
+        grammar += "E -> F [0.8]\n"
+        # old grammar
+        '''grammar += "E -> E '+' F [0.2]\n"
+        grammar += "E -> E '-' F [0.2]\n"
+        grammar += "E -> F [0.6]\n"'''
     else:
         grammar += "E -> F [1.0]\n"
 
@@ -53,12 +59,17 @@ def generate_grammar(symbols):
         '''op_prob = 0.4 / len(operators[1])
         for op in operators[1]:
             grammar += f"F -> F '{op}' T [{op_prob}]\n"'''
-        grammar += "F -> F '/' T [0.08]\n"
-        grammar += "F -> F '*' T [0.2]\n"
-        grammar += "F -> F '*' T '*' T [0.08]\n"
-        grammar += "F -> F '*' T '*' T '*' T [0.03]\n"
+        # new grammar
+        grammar += "F -> F '/' T [0.1]\n"
+        grammar += "F -> F '*' T [0.04]\n"
+        grammar += "F -> F '*' T '*' T [0.03]\n"
+        grammar += "F -> F '*' T '*' T '*' T [0.02]\n"
         grammar += "F -> F '*' T '*' T '*' T '*' T [0.01]\n"
-        grammar += "F -> T [0.6]\n"
+        grammar += "F -> T [0.8]\n"
+        # old grammar
+        '''grammar += "F -> F '*' T [0.2]\n"
+        grammar += "F -> F '/' T [0.2]\n"
+        grammar += "F -> T [0.6]\n"'''
     else:
         grammar += "F -> T [1.0]\n"
 
@@ -71,26 +82,32 @@ def generate_grammar(symbols):
         grammar += "T -> R '(' E ')' [0.2]\n"
         remaining -= 0.2
 
-    remaining /= 3
-    grammar += f"T -> V [{2*remaining}]\n"
+    # for reconstruction accuracy
+    grammar += f"T -> '(' E ')' '^' '(' E ')' [0.1]\n"
+    remaining -= 0.1
+
+    remaining /= 4
+    grammar += f"T -> V [{3 * remaining}]\n"
     grammar += f"T -> '(' E ')' [{remaining}]\n"
 
-    var_prob = 1/len(variables) if not constants else 1/(len(variables)+2)
+    var_prob = 1 / len(variables) if not constants else 1 / (len(variables) + 1)
     for v in variables:
         grammar += f"V -> '{v}' [{var_prob}]\n"
 
     if constants:
-        grammar += f"V -> 'C' [{2*var_prob}]\n"
+        grammar += f"V -> 'C' [{var_prob}]\n"
 
-    function_prob = 1/len(functions)
-    for funct in functions:
-        grammar += f"R -> '{funct}' [{function_prob}]\n"
+    if len(functions) > 0:
+        function_prob = 1 / len(functions)
+        for funct in functions:
+            grammar += f"R -> '{funct}' [{function_prob}]\n"
 
-    powers = sorted(powers)
-    power_probs = [1/(1+int(p[1:])) for p in powers]
-    power_probs = np.array(power_probs) / sum(power_probs)
-    for p, prob in zip(powers, power_probs):
-        grammar += f"P -> '{p}' [{prob}]\n"
+    if len(powers) > 0:
+        powers = sorted(powers)
+        power_probs = [1 / (1 + int(p[1:])) for p in powers]
+        power_probs = np.array(power_probs) / sum(power_probs)
+        for p, prob in zip(powers, power_probs):
+            grammar += f"P -> '{p}' [{prob}]\n"
 
     return grammar
 
@@ -179,18 +196,18 @@ def tokens_to_tree(tokens, symbols, max_arity):
     return out_stack[-1]
 
 
-def generate_expressions(grammar, number_of_all_expressions, symbols, max_arity, max_depth=7):
-    #generator = GeneratorGrammar(grammar)
+def generate_expressions(grammar, number_of_all_expressions, symbols, max_arity, max_depth):
+    generator = GeneratorGrammar(grammar)
     expression_set = set()
-    expressions = []
+    #expressions = []
     expressions_final = []
-    for j in range(max_depth):
-        expressions.append([])
+    #for j in range(max_depth):
+    #    expressions.append([])
     #with open("../expressions.pkl", 'rb') as f:
     #    exprs = pickle.load(f)
     #with open("../expressions_c_equal.pkl", 'rb') as f:
     #    exprs = pickle.load(f)
-    exprs = open("../data/expressions_7_20k_trig.txt")
+    '''exprs = open("../data/expressions_5_15k.txt")
     for expr in exprs.readlines():
         expr = expr[:-1].split(" ")
         if len(expression_set) % 500 == 0:
@@ -206,32 +223,48 @@ def generate_expressions(grammar, number_of_all_expressions, symbols, max_arity,
             expression_set.add(expr_str)
         except:
             continue
-    exprs.close()
-    '''while len(expression_set) < number_of_expressions:
+    exprs.close()'''
+
+    '''trees = read_expressions_json("../data/expression_sets/ng_newgrammar.json")
+    for t in trees:
+        expr = t.to_list()
+
+        expr_tree = tokens_to_tree(expr, symbols, max_arity)
+        expressions_final.append(expr_tree)'''
+
+    '''trees = read_expressions_json("../data/expression_sets/ptrees_5_15k_grammar_trig.json")
+
+    lengths = [0] * 32
+    lengths_new = [0] * 32
+    for tree in trees:
+        lengths[len(tree.to_list()) - 1] += 1
+    print(lengths)
+    while len(expression_set) < number_of_all_expressions:
         if len(expression_set) % 500 == 0:
             print(f"Unique expressions generated so far: {len(expression_set)}")
         expr = generator.generate_one()[0]
 
-        expr_str = "".join(expr)
-        if expr_str in expression_set:
-            continue
-
         try:
-            expr_tree = tokens_to_tree(expr, symbols)
-            expr_length = 0
-            for i in expr:
-                if i != '(' and i != ')':
-                    expr_length += 1
-            if expr_tree.height() > max_depth:  # or expr_length > max_length:
+            expr_tree = tokens_to_tree(expr, symbols, max_arity)
+            expr_str = "".join(expr_tree.to_list())
+            length = len(expr_tree.to_list())
+            if expr_str in expression_set:
                 continue
-            expressions.append(expr_tree)
+            if expr_tree.height() > max_depth or length > 32:  # or expr_length > max_length:
+                continue
+            #if lengths_new[length-1] == lengths[length-1]:
+            #    continue
+            expressions_final.append(expr_tree)
             expression_set.add(expr_str)
+            lengths_new[length-1] += 1
         except:
             continue'''
 
-    '''while len(expression_set) < number_of_all_expressions:
+    while len(expression_set) < number_of_all_expressions:
         if len(expression_set) % 500 == 0:
             print(f"Unique expressions generated so far: {len(expression_set)}")
+            if len(expressions_final) > 0:
+                print("".join(expressions_final[-1].to_list()))
         expr = generator.generate_one()[0]
 
         try:
@@ -240,22 +273,22 @@ def generate_expressions(grammar, number_of_all_expressions, symbols, max_arity,
             #for i in expr:
             #    if i != '(' and i != ')':
             #        expr_length += 1
-            tree_height = expr_tree.height()
+            #tree_height = expr_tree.height()
             expr_str = "".join(expr_tree.to_list())
             if expr_str in expression_set:
                 continue
-            max_bf = expr_tree.max_branching_factor()
-            if tree_height > max_depth or len(expr_tree.to_list()) > 32: # not the same as expression length > 32  # or expr_length > max_length:
+            #max_bf = expr_tree.max_branching_factor()
+            if len([s for s in expr_tree.to_list() if s not in ["(", ")"]]) > 42:  # tree_height > max_depth or
                 continue
 
-            expressions[max_bf].append(expr_tree)
+            #expressions[max_bf].append(expr_tree)
             expressions_final.append(expr_tree)
             expression_set.add(expr_str)
         except:
             continue
-    with open("all_expressions.pkl", "wb") as f:
-        pickle.dump(expressions, f)
-    expressions_final = []
+    #with open("all_expressions.pkl", "wb") as f:
+    #    pickle.dump(expressions, f)
+    '''expressions_final = []
     for j in range(len(expressions)):
         length = len(expressions[j])
         print(length)
@@ -263,7 +296,12 @@ def generate_expressions(grammar, number_of_all_expressions, symbols, max_arity,
         sample = np.random.permutation(length)
         for k in range(stop):
             expressions_final.append(expressions[j][sample[k]])'''
+    #print(lengths_new)
+    #input()
     return expressions_final
+
+def symbol_distance(a, b):
+    return int(a != b)
 
 
 if __name__ == '__main__':
@@ -286,10 +324,56 @@ if __name__ == '__main__':
     # Optional (recommended): Generate training set from a custom grammar
     grammar = None
 
-    #if grammar is None:
-        #grammar = generate_grammar(sy_lib)
+    if grammar is None:
+        grammar = generate_grammar(sy_lib)
 
-    # print(tokens_to_tree(["A", "+", "A", "+", "(", "A", "+", "A", ")"], so2, expr_config["max_arity"]).symbol)
+    f = open("../data/trig15k_newgrammar.txt", 'a')
+    trees = read_expressions_json("../data/expression_sets/trig15k_newgrammar.json")
+    for t in trees:
+        f.write("".join(t.to_list()) + "\n")
+    f.close()
+    input()
+
+
+    '''trees = read_expressions_json("../data/expression_sets/ae2k_newgrammar.json")
+    exprs = []
+    for tree in trees:
+        exprs.append(tree.to_list())
+
+    with open("ae2k_newgrammar.pkl", "wb") as f:
+        pickle.dump(exprs, f)
+    print("Done!")
+
+    input()'''
+
+    lengths = [0] * 42
+    heights = [0] * 25
+    n_nodes = [0] * 42  # number of nodes in the expression tree
+    max_length = -1
+    trees = read_expressions_json("../data/expression_sets/trig15k_newgrammar.json")
+    for t in trees:
+        # print("".join(t.to_list()))
+        length = len([i for i in t.to_list() if i not in ["(", ")"]])
+        if length > max_length:
+            max_length = length
+        lengths[length - 1] += 1
+        height = t.height()
+        heights[height-1] += 1
+        n_nodes[len(t) - 1] += 1
+    print(lengths)
+    print(max_length)
+    print(heights)
+    print(n_nodes)
+    input()
+
+    '''print(tokens_to_tree(["sin", "A", "+", "A", "-", "A", "+", "A"], so2, expr_config["max_arity"]).to_pexpr())
+    input()'''
+
+    '''t1 = tokens_to_tree(['(', 'A', '+', 'A', '+', 'A', ')', '*', 'A'], so2, expr_config["max_arity"])
+    t2 = tokens_to_tree(['A', '+', 'A', '*', 'A', '+', 'A'], so2, expr_config["max_arity"])
+
+    print(editdistance.eval(t1.to_list("postfix"), t2.to_list("postfix")))
+    print(zss.simple_distance(t1, t2, get_label=Node.get_symbol, label_dist=symbol_distance, return_operations=True))'''
 
     expressions = generate_expressions(grammar, es_config["num_expressions"], so2, expr_config["max_arity"],
                                        max_depth=es_config["max_tree_height"])
