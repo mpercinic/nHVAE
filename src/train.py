@@ -5,14 +5,10 @@ import numpy as np
 import torch
 from torch.utils.data import Sampler, Dataset
 from tqdm import tqdm
-import pickle
 
 from hvae_utils import read_expressions_json, load_config_file, create_batch
 from model import HVAE
 from symbol_library import generate_symbol_library
-from tree import Node
-
-# import zss
 
 
 def collate_fn(batch):
@@ -63,16 +59,12 @@ def train_hvae(model, trees, epochs=20, batch_size=32, verbose=True):
     iter_counter = 0
     total_iters = epochs*(len(dataset)//batch_size)
     lmbda = logistic_function(iter_counter, total_iters)
-    #lmbda = (np.tanh(-4.5) + 1) / 2
 
     midpoint = len(dataset) // (2 * batch_size)
 
     for epoch in range(epochs):
         sampler = TreeBatchSampler(batch_size, len(dataset))
         bce, kl, total, num_iters = 0, 0, 0, 0
-
-        tree_count = 0
-        editdist_sum = 0
 
         with tqdm(total=len(dataset), desc=f'Testing - Epoch: {epoch + 1}/{epochs}', unit='chunks') as prog_bar:
             for i, tree_ids in enumerate(sampler):
@@ -89,13 +81,10 @@ def train_hvae(model, trees, epochs=20, batch_size=32, verbose=True):
                 prog_bar.set_postfix(**{'run:': "HVAE",
                                         'loss': (bce+kl) / num_iters,
                                         'BCE': bce / num_iters,
-                                        'KLD': kl / num_iters,
-                                        'avg_editdist': editdist_sum / tree_count if tree_count != 0 else "nan"})
+                                        'KLD': kl / num_iters})
                 prog_bar.update(batch_size)
 
                 lmbda = logistic_function(iter_counter, total_iters)
-                #if iter_counter < 2500:
-                #    lmbda = (np.tanh((iter_counter - 4500) / 1000) + 1) / 2
                 iter_counter += 1
 
                 if verbose and i == midpoint:
@@ -103,17 +92,12 @@ def train_hvae(model, trees, epochs=20, batch_size=32, verbose=True):
                     z = model.encode(batch)[0]
                     decoded_trees = model.decode(z)
                     for i in range(len(decoded_trees)):
-                        #editdist = zss.simple_distance(original_trees[i], decoded_trees[i],
-                        #                               get_label=Node.get_symbol, label_dist=symbol_distance)
                         editdist = editdistance.eval(original_trees[i].to_list("postfix"), decoded_trees[i].to_list("postfix"))
                         if i == 0:
                             print()
-                            # print(original_trees[i].to_pexpr())
                             print(f"O: {original_trees[i]}")
                             print(f"P: {decoded_trees[i]}")
-                            print(int(editdist))
-                        editdist_sum += int(editdist)
-                        tree_count += 1
+                            print("Edit distance: " + str(int(editdist)))
 
 
 if __name__ == '__main__':

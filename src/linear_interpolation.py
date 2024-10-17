@@ -45,26 +45,10 @@ if __name__ == '__main__':
     model = torch.load(training_config["param_path"])
 
     # Expressions we want to interpolate between
-    #exprA = "cos ( A ) / C - C ^ ( A / C )"
-    #exprB = "( sin ( C ) - C ) ^ ( A * C * cos ( C ) ) + C"
+    exprA = "cos ( A ) / C - C ^ ( A / C )"
+    exprB = "( sin ( C ) - C ) ^ ( A * C * cos ( C ) ) + C"
 
-    exprA = "C * C * A * A / C ^ A"
-    #exprA = "sin ( A ) * sin ( C ) * A / C"
-
-    #exprA = "cos ( C ^ ( cos ( A ) * A * C ) ) / A"
-    #exprB = "sin ( A - C + A ) + C + A + C"
-
-
-    exprB = "sin ( A / C * cos ( A ) )"
-
-    #exprB = "cos ( C ) / C * sin ( C ) * C * C"
-    #exprA = "C * sin ( A / C ) * C * C * A"
-    #exprB = "A + cos ( C ) + C - cos ( A / C + A )"
-
-    #exprA = "A + C - cos ( cos ( A ) ) ^ C"
-    #exprB = "C / ( sin ( A ) + A ) ^ C"
-
-    # Number of steps in the interpolation (inclusive with expressions A and B)
+    # Number of steps in the interpolation (including steps with expressions A and B)
     steps = 5
 
     tokensA = exprA.split(" ")

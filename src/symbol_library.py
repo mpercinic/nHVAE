@@ -10,10 +10,10 @@ class SymType(Enum):
 
 
 def generate_symbol_library(num_vars, symbol_list, max_arity, has_constant=True):
+    # only symbols with fixed arity > 0
+    # contains all symbols that can appear, the actual symbols that do appear are defined in the config file
     all_symbols = {
-        # "+": {"symbol": '+', "type": SymType.Operator, "precedence": 0, "psymbol": "add"},
         "-": {"symbol": '-', "type": SymType.Operator, "precedence": 0, "psymbol": "sub", "arity": 2, "key": "-"},
-        # "*": {"symbol": '*', "type": SymType.Operator, "precedence": 1, "psymbol": "mul"},
         "/": {"symbol": '/', "type": SymType.Operator, "precedence": 1, "psymbol": "div", "arity": 2, "key": "/"},
         "^": {"symbol": "^", "type": SymType.Operator, "precedence": 2, "psymbol": "pow", "arity": 2, "key": "^"},
         "sqrt": {"symbol": 'sqrt', "type": SymType.Fun, "precedence": 5, "psymbol": "sqrt", "arity": 1, "key": "sqrt"},
@@ -26,16 +26,14 @@ def generate_symbol_library(num_vars, symbol_list, max_arity, has_constant=True)
         "^4": {"symbol": '^4', "type": SymType.Fun, "precedence": -1, "psymbol": "n4", "arity": 1, "key": "^4"},
         "^5": {"symbol": '^5', "type": SymType.Fun, "precedence": -1, "psymbol": "n5", "arity": 1, "key": "^5"},
     }
+    # adding symbols that do not have fixed arity
     for i in range(2, max_arity + 1):
         all_symbols["+" + str(i)] = {"symbol": '+', "type": SymType.Operator, "precedence": 0, "psymbol": "add",
                                      "arity": i, "key": "+" + str(i)}
         all_symbols["*" + str(i)] = {"symbol": '*', "type": SymType.Operator, "precedence": 1, "psymbol": "mul",
                                      "arity": i, "key": "*" + str(i)}
-        '''all_symbols["-" + str(i)] = {"symbol": '-', "type": SymType.Operator, "precedence": 0, "psymbol": "sub",
-                                     "arity": i, "key": "-" + str(i)}
-        all_symbols["/" + str(i)] = {"symbol": '/', "type": SymType.Operator, "precedence": 1, "psymbol": "div",
-                                     "arity": i, "key": "/" + str(i)}'''
     variable_names = 'ABDEFGHIJKLMNOPQRSTUVWXYZČŠŽ'
+    # adding variables and constants
     symbols = []
     for i in range(num_vars):
         if i < len(variable_names):
@@ -55,6 +53,7 @@ def generate_symbol_library(num_vars, symbol_list, max_arity, has_constant=True)
             raise Exception(f"Symbol {s} is not in the standard library, please add it into the all_symbols variable"
                             f" from the generate_symbol_library method in symbol_library.py")
 
+    # all symbols with arity > 0, for symbols without fixed arity, the arity parameter is omitted
     all_symbols2 = {
         "+": {"symbol": '+', "type": SymType.Operator, "precedence": 0, "psymbol": "add"},
         "-": {"symbol": '-', "type": SymType.Operator, "precedence": 0, "psymbol": "sub", "arity": 2},

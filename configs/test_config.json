@@ -1,10 +1,8 @@
 {
   "expression_definition": {
     // Fixed arity operators and functions that occur in expressions
-    //"symbols": ["-", "/", "sin", "cos", "exp", "sqrt", "log", "^2", "^3", "^4", "^5"],
     "symbols": ["-", "/", "^", "sin", "cos"],
     // All operators and functions that occur in expressions
-    //"symbols2": ["+", "-", "*", "/", "sin", "cos", "exp", "sqrt", "log", "^2", "^3", "^4", "^5"],
     "symbols2": ["+", "-", "*", "/", "^", "sin", "cos"],
     // Number of variables that occur in expressions
     "num_variables": 1,
@@ -17,13 +15,11 @@
     // Parameters for creating a new training set
     // Number of generated expressions
     "num_expressions": 15000,
-    // Max height of the generated expression trees
-    "max_tree_height": 5,
-    // Max length of the generated expression
-    // "max_expression_length": 32,
+    // Max length of the generated expression (in infix notation)
+    "max_expression_length": 25,
     // Path where the generated expression set will be saved. If empty string, the expression set won't be saved
     // This path is also used in training and reconstruction script as input into the model
-    "expression_set_path": "../data/expression_sets/trig15k_newgrammar.json"
+    "expression_set_path": "../data/expression_sets/mt15k.json"
   },
   "training": {
     // Number of epochs the model trains for
@@ -34,16 +30,16 @@
     "latent_size": 128,
     "seed": 18,
     // Path where model parameters will be saved. If empty string, the parameters won't be saved
-    "param_path": "../params/ng/ng32/trig15k_newgrammar_complex.pt"
+    "param_path": "../params/example_set.pt"
   },
   "reconstruction": {
     // If smaller dataset is True, it will train the model with the specified number of expressions
     "smaller_dataset": false,
-    "num_examples": 6000,
+    "num_examples": 2000,
     // Number of folds for the K-Fold cross-validation
     "n_folds": 5,
     // Path where results of the evaluation will be saved
-    "results_path": "../results/hvae2.txt"
+    "results_path": "../results/hvae.txt"
   },
   "symbolic_regression": {
     // Name of the baseline: two options currently available:
@@ -57,14 +53,14 @@
     // RMSE when an error occurs during the evaluation of an expression (e.g. division by zero)
     "default_error": 1e10,
     // Path to the tabular data for symbolic regression -> train set
-    "train_set_path": "../data/nguyen/nguyen6_train.csv",
+    "train_set_path": "../data/sr/train.csv",
     // Path to the tabular data for symbolic regression -> test set (not relevant yet)
-    "test_set_path": "../data/nguyen/nguyen6_test.csv",
+    "test_set_path": "../data/sr/test.csv",
     // Threshold for the highest RMSE allowed, so that an equation is deemed to be successful (typically ~ 1e-7 for
     // expressions without constants and ~ 1e-4 for expressions with constant parameters)
     "success_threshold": 1e-5,
     // Path to the file where results will be saved
-    "results_path": "../results/nguyen/ng6_edhie_oldgrammar_simple.json",
+    "results_path": "../results/sr_results.json",
     "seed": 18,
     // Number of times each baseline will be ran
     "number_of_runs": 10,

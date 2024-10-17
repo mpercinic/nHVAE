@@ -41,14 +41,6 @@ class Node:
             height_max = t.height()
         return 1 + height_max
 
-    def max_branching_factor(self):
-        max_bf = len(self.children)
-        for t in self.children:
-            bf = t.max_branching_factor()
-            if bf > max_bf:
-                max_bf = bf
-        return max_bf
-
     def get_symbol(self):
         return self.symbol
 
