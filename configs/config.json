@@ -1,0 +1,42 @@
+{
+  "expression_definition": {
+    // All operators and functions that occur in expressions
+    "symbols": ["+", "-", "*", "/", "sin", "cos", "exp", "sqrt", "log", "^2", "^3"],
+    // Number of variables that occur in expressions
+    "num_variables": 1,
+    // Maximum arity of operators that occur in expressions
+    "max_arity": 5,
+    // True if expressions also contain constant parameters, otherwise false
+    "has_constants": true
+  },
+  "expression_set_generation": {
+    // Parameters for creating a new training set
+    // Number of generated expressions
+    "num_expressions": 40000,
+    // Max no. of nodes in the generated expression trees
+    "max_length": 25,
+    // Path where the generated expression set will be saved. If empty string, the expression set won't be saved
+    // This path is also used in training and reconstruction script as input into the model
+    "expression_set_path": "../data/expression_sets/40k.json"
+  },
+  "training": {
+    // Number of epochs the model trains for
+    "epochs": 20,
+    "batch_size": 32,
+    "verbose": true,
+    // Dimensionality of the latent space
+    "latent_size": 128,
+    "seed": 18,
+    // Path where model parameters will be saved. If empty string, the parameters won't be saved
+    "param_path": "../params/40k.pt"
+  },
+  "reconstruction": {
+    // If smaller dataset is True, it will train the model with the specified number of expressions
+    "smaller_dataset": true,
+    "num_expressions": 6000,
+    // Number of folds for the K-Fold cross-validation
+    "n_folds": 5,
+    // Path where results of the evaluation will be saved
+    "results_path": "../results/nhvae.txt"
+  }
+}
