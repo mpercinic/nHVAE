@@ -76,18 +76,14 @@ class Encoder(nn.Module):
         return mu, logvar
 
     def recursive_forward(self, tree):
-        children = []
-        for t in tree.children:
-            children.append(self.recursive_forward(t))
+        children = [self.recursive_forward(t) for t in tree.children]
         if len(children) == 0:
-            children.append(torch.zeros(tree.target.size(0), 1, self.hidden_size))
-            child_sum = children[0]
+            child_sum = torch.zeros(tree.target.size(0), 1, self.hidden_size)
+            children.append(child_sum)
         else:
             child_sum = torch.zeros(children[0].size())
-            i = 0
-            for c in children:
-                child_sum = child_sum + self.ws[i](c)
-                i += 1
+            for i in range(len(children)):
+                child_sum = child_sum + self.ws[i](children[i])
 
         hidden = self.gru(tree.target, self.w_e(child_sum), children)
         hidden = hidden.mul(tree.mask[:, None, None])
@@ -118,16 +114,14 @@ class Decoder(nn.Module):
     # Used during training to guide the learning process
     def forward(self, z, tree):
         hidden = self.z2h(z)
-        s = torch.transpose(torch.stack([torch.zeros(32)] * self.output_size), 0, 1)[:, None, :]
+        s = torch.transpose(torch.stack([torch.zeros(hidden.shape[0])] * self.output_size), 0, 1)[:, None, :]
         self.recursive_forward(hidden, tree, s)
         return tree
 
     def recursive_forward(self, hidden_a, tree, s):
         p_f = torch.sigmoid(self.w_p(hidden_a))
 
-        p_f_negation = []
-        for i in p_f[:, 0, 0]:
-            p_f_negation.append(1 - i.item())
+        p_f_negation = [1 - i.item() for i in p_f[:, 0, 0]]
         pred_f = torch.cat((torch.Tensor(p_f_negation)[:, None, None], p_f), dim=2)
 
         prediction = self.h2o(hidden_a)
@@ -137,24 +131,17 @@ class Decoder(nn.Module):
         tree.fraternal = {'prediction': pred_f, 'target': s[:, :, 0][:, :, None]}
 
         first = True
-        i = 0
-        for t in tree.children:
-            if t is not None:
-                # computing new s values
-                if i + 1 == len(tree.children):
-                    s = torch.transpose(torch.stack([torch.zeros(32)] * self.output_size), 0, 1)[:, None, :]
-                else:
-                    s = torch.Tensor([0 if s == '' else 1 for s in tree.children[i + 1].symbols])
-                    s = torch.transpose(torch.stack([s] * self.output_size), 0, 1)[:, None, :]
+        for i in range(len(tree.children)):
+            # computing new s values
+            s = torch.zeros(hidden_a.shape[0]) if i+1 == len(tree.children) else torch.Tensor([0 if s == '' else 1 for s in tree.children[i + 1].symbols])
+            s = torch.transpose(torch.stack([s] * self.output_size), 0, 1)[:, None, :]
 
-                if first:
-                    hidden = self.gru(symbol_probs, torch.zeros(symbol_probs.size()), hidden_a, torch.zeros(hidden_a.size()))
-                    hidden_f, symbol_probs_f = self.recursive_forward(self.w_d(hidden), t, s)
-                else:
-                    hidden = self.gru(symbol_probs, symbol_probs_f, hidden_a, hidden_f)
-                    hidden_f, symbol_probs_f = self.recursive_forward(self.w_d(hidden), t, s)
-                first = False
-                i += 1
+            x = torch.zeros(symbol_probs.size()) if first else symbol_probs_f
+            h = torch.zeros(hidden_a.size()) if first else hidden_f
+
+            hidden = self.gru(symbol_probs, x, hidden_a, h)
+            hidden_f, symbol_probs_f = self.recursive_forward(self.w_d(hidden), tree.children[i], s)
+            first = False
 
         return hidden_a, symbol_probs
 
@@ -180,16 +167,14 @@ class Decoder(nn.Module):
         children = []
         hasNextChild = True
         for i in range(child_mask.size(0)):
-            if not hasNextChild:
-                break
+            if not hasNextChild: break
             if torch.any(child_mask[i]) and first:
-                hidden = self.gru(prediction, torch.zeros(prediction.size()), hidden_a, torch.zeros(hidden_a.size()))
-                child, hidden_f, prediction_f, s_f = self.recursive_decode(self.w_d(hidden), symbol_dict, child_mask[i], symbols_multiarity)
-                children.append(child)
+                x, h = torch.zeros(prediction.size()), torch.zeros(hidden_a.size())
             elif not first:
-                hidden = self.gru(prediction, prediction_f, hidden_a, hidden_f)
-                child, hidden_f, prediction_f, s_f = self.recursive_decode(self.w_d(hidden), symbol_dict, child_mask[i], symbols_multiarity)
-                children.append(child)
+                x, h = prediction_f, hidden_f
+            hidden = self.gru(prediction, x, hidden_a, h)
+            child, hidden_f, prediction_f, s_f = self.recursive_decode(self.w_d(hidden), symbol_dict, child_mask[i], symbols_multiarity)
+            children.append(child)
 
             if i < len(child_mask) - 1 and not torch.any(child_mask[i+1]):
                 hasNextChild = False
