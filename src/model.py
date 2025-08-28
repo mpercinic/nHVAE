@@ -78,7 +78,7 @@ class Encoder(nn.Module):
     def recursive_forward(self, tree):
         children = [self.recursive_forward(t) for t in tree.children]
         if len(children) == 0:
-            child_sum = torch.zeros(tree.target.size(0), 1, self.hidden_size)
+            child_sum = torch.zeros(tree.target.size(0), self.hidden_size)
             children.append(child_sum)
         else:
             child_sum = torch.zeros(children[0].size())
@@ -86,7 +86,7 @@ class Encoder(nn.Module):
                 child_sum = child_sum + self.ws[i](children[i])
 
         hidden = self.gru(tree.target, self.w_e(child_sum), children)
-        hidden = hidden.mul(tree.mask[:, None, None])
+        hidden = hidden.mul(tree.mask[:, None])
         return hidden
 
 
@@ -114,27 +114,24 @@ class Decoder(nn.Module):
     # Used during training to guide the learning process
     def forward(self, z, tree):
         hidden = self.z2h(z)
-        s = torch.transpose(torch.stack([torch.zeros(hidden.shape[0])] * self.output_size), 0, 1)[:, None, :]
+        s = torch.zeros(hidden.shape[0])
         self.recursive_forward(hidden, tree, s)
         return tree
 
     def recursive_forward(self, hidden_a, tree, s):
         p_f = torch.sigmoid(self.w_p(hidden_a))
-
-        p_f_negation = [1 - i.item() for i in p_f[:, 0, 0]]
-        pred_f = torch.cat((torch.Tensor(p_f_negation)[:, None, None], p_f), dim=2)
+        p_f_negation = [1 - i.item() for i in p_f[:, 0]]
+        pred_f = torch.cat((torch.Tensor(p_f_negation)[:, None], p_f), dim=1)
 
         prediction = self.h2o(hidden_a)
-        symbol_probs = F.softmax(prediction, dim=2)
+        symbol_probs = F.softmax(prediction, dim=1)
 
         tree.prediction = prediction
-        tree.fraternal = {'prediction': pred_f, 'target': s[:, :, 0][:, :, None]}
+        tree.fraternal = {'prediction': pred_f, 'target': s}
 
         first = True
         for i in range(len(tree.children)):
-            # computing new s values
             s = torch.zeros(hidden_a.shape[0]) if i+1 == len(tree.children) else torch.Tensor([0 if s == '' else 1 for s in tree.children[i + 1].symbols])
-            s = torch.transpose(torch.stack([s] * self.output_size), 0, 1)[:, None, :]
 
             x = torch.zeros(symbol_probs.size()) if first else symbol_probs_f
             h = torch.zeros(hidden_a.size()) if first else hidden_f
@@ -156,11 +153,9 @@ class Decoder(nn.Module):
 
     def recursive_decode(self, hidden_a, symbol_dict, mask, symbols_multiarity):
         p_f = torch.sigmoid(self.w_p(hidden_a))
+        s = torch.Tensor([1 if i.item() >= 0.5 else 0 for i in p_f[:, 0]])
 
-        s = torch.Tensor([1 if i.item() >= 0.5 else 0 for i in p_f[:, 0, 0]])
-
-        prediction = F.softmax(self.h2o(hidden_a), dim=2)
-        # Sample symbol in a given node
+        prediction = F.softmax(self.h2o(hidden_a), dim=1)
         symbols, child_mask = self.sample_symbol(prediction, symbol_dict, mask)
 
         first = True
@@ -177,11 +172,7 @@ class Decoder(nn.Module):
             children.append(child)
 
             if i < len(child_mask) - 1 and not torch.any(child_mask[i+1]):
-                hasNextChild = False
-                for symbol in symbols_multiarity:
-                    if symbol in symbols:
-                        hasNextChild = True
-                        break
+                hasNextChild = True if any([symbol in symbols for symbol in symbols_multiarity]) else False
                 if hasNextChild:
                     hasNextChild = torch.sum(s_f).item() > 0
                     test = torch.Tensor([1 if sym in symbols_multiarity else 0 for sym in symbols])
@@ -194,13 +185,13 @@ class Decoder(nn.Module):
         return node, hidden_a, prediction, s
 
     def sample_symbol(self, prediction, symbol_dict, mask):
-        sampled = F.softmax(prediction, dim=2)
+        sampled = F.softmax(prediction, dim=1)
         # Select the symbol with the highest value ("probability")
         symbols = []
 
         for i in range(sampled.size(0)):
             if mask[i]:
-                symbol = symbol_dict[torch.argmax(sampled[i, 0, :])]
+                symbol = symbol_dict[torch.argmax(sampled[i, :])]
                 symbols.append(symbol["key"])
             else:
                 symbols.append("")
@@ -275,8 +266,8 @@ class GRU221(nn.Module):
         torch.nn.init.xavier_uniform_(self.whn.weight)
 
     def forward(self, x1, x2, h1, h2):
-        h = torch.cat([h1, h2], dim=2)
-        x = torch.cat([x1, x2], dim=2)
+        h = torch.cat([h1, h2], dim=1)
+        x = torch.cat([x1, x2], dim=1)
         r = torch.sigmoid(self.wxr(x) + self.whr(h))
         z = torch.sigmoid(self.wxz(x) + self.whz(h))
         n = torch.tanh(self.wxn(x) + r * self.whn(h))
