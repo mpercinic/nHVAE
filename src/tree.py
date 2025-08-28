@@ -95,7 +95,7 @@ class Node:
                             " method to add a symbol library to trees before encoding.")
         target = torch.zeros(len(Node._symbols)).float()
         target[Node._s2c[self.symbol]] = 1.0
-        self.target = Variable(target[None, None, :])
+        self.target = Variable(target[None, :])
         for t in self.children:
             t.add_target_vectors()
 
@@ -130,7 +130,7 @@ class Node:
         if matrix_type == "target":
             reps.append(torch.Tensor([Node._s2c[tree.symbol]]).long())
         else:
-            reps.append(tree.prediction[0, :, :])
+            reps.append(tree.prediction[0, :])
 
         for t in tree.children:
             reps.append(Node.to_matrix(t, matrix_type))
@@ -198,12 +198,10 @@ class BatchedNode:
 
     def loss(self, mu, logvar, lmbda, criterion, beta):
         pred = BatchedNode.get_prediction(self)
-        pred = torch.permute(pred, [0, 2, 1])
         target = BatchedNode.get_target(self)
 
         pred_f = BatchedNode.get_fraternal_pred(self)
-        pred_f = torch.permute(pred_f, [0, 2, 1])
-        target_f = BatchedNode.get_fraternal_target(self, [], 0)[:, :, 0].long()
+        target_f = BatchedNode.get_fraternal_target(self, [], 0).long()
 
         BCE = criterion(pred, target) + beta * criterion(pred_f, target_f)
         KLD = (lmbda * -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp()))/mu.size(0)
@@ -213,14 +211,14 @@ class BatchedNode:
         if BatchedNode._symbols is None:
             raise Exception("Encoding needs a symbol library to create target vectors. Please use"
                             " BatchedNode.add_symbols method to add a symbol library to trees before encoding.")
-        target = torch.zeros((len(self.symbols), 1, len(Node._symbols)))
+        target = torch.zeros((len(self.symbols), len(Node._symbols)))
         mask = torch.ones(len(self.symbols))
 
         for i, s in enumerate(self.symbols):
             if s == "":
                 mask[i] = 0
             else:
-                target[i, 0, Node._s2c[s]] = 1
+                target[i, Node._s2c[s]] = 1
 
         self.mask = mask
         self.target = Variable(target)
@@ -251,13 +249,12 @@ class BatchedNode:
     def get_prediction(tree):
         reps = []
 
-        target = tree.prediction[:, 0, :]
-        reps.append(target[:, None, :])
+        reps.append(tree.prediction[:, :, None])
 
         for t in tree.children:
             reps.append(BatchedNode.get_prediction(t))
 
-        return torch.cat(reps, dim=1)
+        return torch.cat(reps, dim=2)
 
     @staticmethod
     def get_target(tree):
@@ -280,20 +277,20 @@ class BatchedNode:
     def get_fraternal_pred(tree):
         preds = []
 
-        preds.append(tree.fraternal['prediction'])
+        preds.append(tree.fraternal['prediction'][:, :, None])
 
         i = 0
         for t in tree.children:
             preds.append(BatchedNode.get_fraternal_pred(t))
             i += 1
 
-        return torch.cat(preds, dim=1)
+        return torch.cat(preds, dim=2)
 
     @staticmethod
     def get_fraternal_target(tree, symbols, num):
         targets = []
 
-        test = torch.zeros(tree.fraternal['target'].size())
+        test = torch.zeros(tree.fraternal['target'].size())[:, None]
         for i in range(len(symbols)):
             if symbols[i] not in ['+', '*'] or num == 0: #or num == 4:
                 test[i] = -1
