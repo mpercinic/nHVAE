@@ -123,7 +123,8 @@ if __name__ == '__main__':
 
     trees = read_expressions_json(es_config["expression_set_path"])
 
-    model = nHVAE(len(sy_lib), training_config["latent_size"], expr_config["max_arity"])
+    max_arity = max([t.max_branching_factor() for t in trees])
+    model = nHVAE(len(sy_lib), training_config["latent_size"], max_arity)
 
     train_hvae(model, trees, training_config["epochs"], training_config["batch_size"], training_config["verbose"])
 

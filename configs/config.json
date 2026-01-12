@@ -33,7 +33,7 @@
   "reconstruction": {
     // If smaller dataset is True, it will train the model with the specified number of expressions
     "smaller_dataset": true,
-    "num_expressions": 6000,
+    "num_expressions": 2000,
     // Number of folds for the K-Fold cross-validation
     "n_folds": 5,
     // Path where results of the evaluation will be saved
