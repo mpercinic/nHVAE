@@ -38,6 +38,25 @@ class Node:
     def get_symbol(self):
         return self.symbol
 
+    def max_branching_factor(self):
+        if len(self.children) == 0:
+            return 0
+        return max([len(self.children)] + [c.max_branching_factor() for c in self.children])
+
+    def to_pexpr(self):
+        self.children = [t for t in self.children if t is not None]
+        if Node._symbols is None:
+            raise Exception("To generate a pexpr, symbol library is needed. Please use"
+                            " the Node.add_symbols methods to add them, before using the to_list method.")
+        expression = [Node._symbols[Node._s2c[self.symbol]]["psymbol"]]
+        if len(self.children) != 0:
+            expression += '('
+        for t in self.children:
+            expression += t.to_pexpr()
+        if len(self.children) != 0:
+            expression += ')'
+        return expression
+
     @staticmethod
     def symbol_type(symbol):
         return Node._symbols[Node._s2c[symbol]]["type"].value
