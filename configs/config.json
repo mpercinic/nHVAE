@@ -14,10 +14,10 @@
     // Number of generated expressions
     "num_expressions": 40000,
     // Max no. of nodes in the generated expression trees
-    "max_length": 25,
+    "max_length": 40,
     // Path where the generated expression set will be saved. If empty string, the expression set won't be saved
     // This path is also used in training and reconstruction script as input into the model
-    "expression_set_path": "../data/expression_sets/40k.json"
+    "expression_set_path": "../data/expression_sets/40krepeated.json"
   },
   "training": {
     // Number of epochs the model trains for
@@ -28,7 +28,7 @@
     "latent_size": 128,
     "seed": 18,
     // Path where model parameters will be saved. If empty string, the parameters won't be saved
-    "param_path": "../params/40k.pt"
+    "param_path": "../params/40krepeated.pt"
   },
   "reconstruction": {
     // If smaller dataset is True, it will train the model with the specified number of expressions

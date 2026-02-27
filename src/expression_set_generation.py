@@ -4,7 +4,7 @@ import json
 from ProGED.generators.grammar import GeneratorGrammar
 
 from tree import Node
-from hvae_utils import load_config_file
+from utils import load_config_file
 from symbol_library import generate_symbol_library, SymType
 
 
@@ -139,9 +139,9 @@ def generate_expressions(grammar, number_of_all_expressions, symbols, max_arity,
     expression_set = set()
     expression_trees = []
 
-    while len(expression_set) < number_of_all_expressions:
-        if len(expression_set) % 500 == 0:
-            print(f"Unique expressions generated so far: {len(expression_set)}")
+    while len(expression_trees) < number_of_all_expressions:
+        if len(expression_trees) % 500 == 0:
+            print(f"Unique expressions generated so far: {len(expression_trees)}")
             if len(expression_trees) > 0:
                 print("".join(expression_trees[-1].to_list()))
         expr = generator.generate_one()[0]
@@ -149,15 +149,15 @@ def generate_expressions(grammar, number_of_all_expressions, symbols, max_arity,
         try:
             expr_tree = tokens_to_tree(expr, symbols, max_arity)
             expr_str = "".join(expr_tree.to_list())
-            if expr_str in expression_set:
-                continue
+            #if expr_str in expression_set:
+            #    continue
             if len([s for s in expr_tree.to_list() if s not in ["(", ")"]]) > max_length:
                 continue
         except:
             continue
         expression_trees.append(expr_tree)
         expression_set.add(expr_str)
-
+    print(len(expression_trees))
     return expression_trees
 
 def symbol_distance(a, b):

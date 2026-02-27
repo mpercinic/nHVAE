@@ -6,7 +6,7 @@ from torch.utils.data import Sampler, Dataset
 from tqdm import tqdm
 import zss
 
-from hvae_utils import read_expressions_json, load_config_file, create_batch
+from utils import read_expressions_json, load_config_file, create_batch
 from model import nHVAE
 from symbol_library import generate_symbol_library
 from tree import Node
