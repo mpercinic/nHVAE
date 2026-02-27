@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 import torch
 
 from model import nHVAE
-from hvae_utils import tokens_to_tree, load_config_file, create_batch
+from utils import tokens_to_tree, load_config_file, create_batch
 from symbol_library import generate_symbol_library
 
 

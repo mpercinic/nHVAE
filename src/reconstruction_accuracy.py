@@ -6,7 +6,7 @@ import torch
 from sklearn.model_selection import KFold
 import zss
 
-from hvae_utils import read_expressions_json, load_config_file, create_batch
+from utils import read_expressions_json, load_config_file, create_batch
 from symbol_library import generate_symbol_library
 from model import nHVAE
 from train import train_hvae
