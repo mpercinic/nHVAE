@@ -1,7 +1,12 @@
 {
-  "expression_definition": {
+  // define which data set to use: expr for expression trees or neuro for parse trees
+  // if neuro -> make sure to set "num_variables" to 0 and "has_constants" to false
+  "dataset": "expr",
+  "data_definition": {
     // All operators and functions that occur in expressions
-    "symbols": ["+", "-", "*", "/", "sin", "cos", "exp", "sqrt", "log", "^2", "^3"],
+    "expr_symbols": ["+", "-", "*", "/", "sin", "cos", "exp", "sqrt", "log", "^2", "^3"],
+    // All symbols for neuroscience data sets
+    "neuro_symbols": ["Node", "Pops2", "Pop1", "Pop2", "InputDyn", "OutputDyn", "ECF", "SCF", "CF", "S", "P", "V", "CM1", "CM2", "CM", "Digit", "SN", "second_order_kernel", "exp_kernel", "gating_kinetics", "linear_kernel", "voltage_gated_dynamics", "direct_readout", "membrane_integrator", "difference", "spatial_gradient", "linear", "custom", "false", "saturating_sigmoid", "relaxed_rectifier", "baseline_sigmoid", "+", "*", "x1", "x2", "full", "null", "ring", "star", "hub_tail", "star_feedback_tail", "star_loop_extended", "ei_extended", "small_world", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "true"],
     // Number of variables that occur in expressions
     "num_variables": 1,
     // Maximum arity of operators that occur in expressions
@@ -9,15 +14,15 @@
     // True if expressions also contain constant parameters, otherwise false
     "has_constants": true
   },
-  "expression_set_generation": {
+  "data_set_generation": {
     // Parameters for creating a new training set
-    // Number of generated expressions
-    "num_expressions": 40000,
-    // Max no. of nodes in the generated expression trees
-    "max_length": 40,
-    // Path where the generated expression set will be saved. If empty string, the expression set won't be saved
+    // Number of generated trees
+    "num_trees": 40000,
+    // Max no. of nodes in the generated trees
+    "max_length": 25,
+    // Path where the generated data set will be saved. If empty string, the data set won't be saved
     // This path is also used in training and reconstruction script as input into the model
-    "expression_set_path": "../data/expression_sets/40krepeated.json"
+    "data_set_path": "../data/40k_expr.json"
   },
   "training": {
     // Number of epochs the model trains for
@@ -28,12 +33,12 @@
     "latent_size": 128,
     "seed": 18,
     // Path where model parameters will be saved. If empty string, the parameters won't be saved
-    "param_path": "../params/40krepeated.pt"
+    "param_path": "../params/40k_expr.pt"
   },
   "reconstruction": {
-    // If smaller dataset is True, it will train the model with the specified number of expressions
-    "smaller_dataset": true,
-    "num_expressions": 2000,
+    // If smaller dataset is True, it will train the model with the specified number of examples
+    "smaller_dataset": false,
+    "num_trees": 2000,
     // Number of folds for the K-Fold cross-validation
     "n_folds": 5,
     // Path where results of the evaluation will be saved

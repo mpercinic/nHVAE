@@ -1,6 +1,8 @@
 import torch
 from torch.autograd import Variable
 from symbol_library import SymType
+from utils import all_symbols_neuro
+from validity_checking import Grammar
 
 
 def is_float(element: any) -> bool:
@@ -26,9 +28,6 @@ class Node:
         self.target = None
         self.prediction = None
 
-    def __str__(self):
-        return "".join(self.to_list())
-
     def __len__(self):
         len_sum = 0
         for t in self.children:
@@ -42,6 +41,9 @@ class Node:
         if len(self.children) == 0:
             return 0
         return max([len(self.children)] + [c.max_branching_factor() for c in self.children])
+
+    def to_string(self, dataset):
+        return "".join(self.to_list(dataset))
 
     def to_pexpr(self):
         self.children = [t for t in self.children if t is not None]
@@ -74,39 +76,47 @@ class Node:
         return (Node.symbol_precedence(symbol1) == Node.symbol_precedence(symbol2)
                 and (symbol1 == '-' or symbol1 == '/'))
 
-    def to_list(self):
-        self.children = [t for t in self.children if t is not None]
-        if Node._symbols is None:
-            raise Exception("To generate a list of token in the infix notation, symbol library is needed. Please use"
-                            " the Node.add_symbols methods to add them, before using the to_list method.")
+    def to_list(self, dataset):
+        if dataset == 'expr':
+            self.children = [t for t in self.children if t is not None]
+            if Node._symbols is None:
+                raise Exception("To generate a list of token in the infix notation, symbol library is needed. Please use"
+                                " the Node.add_symbols methods to add them, before using the to_list method.")
 
-        if is_float(self.symbol):
-            return [self.symbol]
-        stype = Node.symbol_type(self.symbol)
-        if stype == SymType.Var.value or stype == SymType.Const.value:
-            return [self.symbol]
-        elif stype == SymType.Fun.value and len(self.children) == 1:
-            expression = self.children[0].to_list()
-            if Node.symbol_precedence(self.symbol) > 0:
-                return [self.symbol, "("] + expression + [")"]
+            if is_float(self.symbol):
+                return [self.symbol]
+            stype = Node.symbol_type(self.symbol)
+            if stype == SymType.Var.value or stype == SymType.Const.value:
+                return [self.symbol]
+            elif stype == SymType.Fun.value and len(self.children) == 1:
+                expression = self.children[0].to_list()
+                if Node.symbol_precedence(self.symbol) > 0:
+                    return [self.symbol, "("] + expression + [")"]
+                else:
+                    if len(self.children[0]) > 1:
+                        expression = ["("] + expression + [")"]
+                    return expression + [self.symbol]
+            elif stype == SymType.Operator.value:
+                expression = []
+                first = True
+                for t in self.children:
+                    expression += [self.symbol[0]] if not first else []
+                    subexpression = t.to_list()
+                    if -1 < Node.symbol_precedence(t.symbol) < Node.symbol_precedence(self.symbol) \
+                            or (not first and Node.has_precedence(self.symbol, t.symbol)):
+                        subexpression = ["("] + subexpression + [")"]
+                    expression += subexpression
+                    first = False
+                return expression
             else:
-                if len(self.children[0]) > 1:
-                    expression = ["("] + expression + [")"]
-                return expression + [self.symbol]
-        elif stype == SymType.Operator.value:
-            expression = []
-            first = True
+                raise Exception("Invalid symbol type")
+        elif dataset == 'neuro':
+            res = [self.symbol]
             for t in self.children:
-                expression += [self.symbol[0]] if not first else []
-                subexpression = t.to_list()
-                if -1 < Node.symbol_precedence(t.symbol) < Node.symbol_precedence(self.symbol) \
-                        or (not first and Node.has_precedence(self.symbol, t.symbol)):
-                    subexpression = ["("] + subexpression + [")"]
-                expression += subexpression
-                first = False
-            return expression
+                res += t.to_list()
+            return res
         else:
-            raise Exception("Invalid symbol type")
+            raise Exception("Invalid data set. Please provide a valid data set in the config file.")
 
     def add_target_vectors(self):
         if Node._symbols is None:
@@ -160,6 +170,19 @@ class Node:
     def add_symbols(symbols):
         Node._symbols = symbols
         Node._s2c = {s["key"]: i for i, s in enumerate(symbols)}
+
+    def verify(self, grammar: Grammar):
+        if "'" + self.symbol + "'" in grammar.terminals:
+            if len(self.children) > 0:
+                return False
+            return True
+        else:
+            for child in self.children:
+                if not child.verify(grammar):
+                    return False
+
+            rhs = [child.symbol if "'" + child.symbol + "'" not in grammar.terminals else "'" + child.symbol + "'" for child in self.children]
+            return grammar.rhs_in_mask(self.symbol, rhs)
 
 
 class BatchedNode:
@@ -215,12 +238,12 @@ class BatchedNode:
                     child.add_tree(t)
                     self.children.append(child)
 
-    def loss(self, mu, logvar, lmbda, criterion, beta):
+    def loss(self, mu, logvar, lmbda, criterion, beta, dataset):
         pred = BatchedNode.get_prediction(self)
         target = BatchedNode.get_target(self)
 
         pred_f = BatchedNode.get_fraternal_pred(self)
-        target_f = BatchedNode.get_fraternal_target(self, [], 0).long()
+        target_f = BatchedNode.get_fraternal_target(self, [], 0, dataset).long()
 
         BCE = criterion(pred, target) + beta * criterion(pred_f, target_f)
         KLD = (lmbda * -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp()))/mu.size(0)
@@ -306,12 +329,14 @@ class BatchedNode:
         return torch.cat(preds, dim=2)
 
     @staticmethod
-    def get_fraternal_target(tree, symbols, num):
+    def get_fraternal_target(tree, symbols, num, dataset):
         targets = []
 
         test = torch.zeros(tree.fraternal['target'].size())[:, None]
         for i in range(len(symbols)):
-            if symbols[i] not in ['+', '*'] or num == 0: #or num == 4:
+            if dataset == 'expr' and (symbols[i] not in ['+', '*'] or num == 0): #or num == 4:
+                test[i] = -1
+            elif dataset == 'neuro' and (symbols[i] == '' or "arity" in all_symbols_neuro[symbols[i]] or num < all_symbols_neuro[symbols[i]]["min_arity"]-1):
                 test[i] = -1
             else:
                 test[i] = tree.fraternal['target'][i]
@@ -322,7 +347,7 @@ class BatchedNode:
 
         i = 0
         for t in tree.children:
-            targets.append(BatchedNode.get_fraternal_target(t, tree.symbols, i))
+            targets.append(BatchedNode.get_fraternal_target(t, tree.symbols, i, dataset))
             i += 1
 
         return torch.cat(targets, dim=1)

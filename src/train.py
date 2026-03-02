@@ -6,7 +6,7 @@ from torch.utils.data import Sampler, Dataset
 from tqdm import tqdm
 import zss
 
-from utils import read_expressions_json, load_config_file, create_batch
+from utils import read_trees_json, load_config_file, create_batch
 from model import nHVAE
 from symbol_library import generate_symbol_library
 from tree import Node
@@ -71,7 +71,7 @@ def train_hvae(model, trees, epochs=20, batch_size=32, verbose=True):
                 batch = create_batch([dataset[j] for j in tree_ids])
 
                 mu, logvar, outputs = model(batch)
-                loss, bcel, kll = outputs.loss(mu, logvar, lmbda, criterion, 2)
+                loss, bcel, kll = outputs.loss(mu, logvar, lmbda, criterion, 2, datasetstr)
                 bce += bcel.detach().item()
                 kl += kll.detach().item()
                 optimizer.zero_grad()
@@ -96,35 +96,37 @@ def train_hvae(model, trees, epochs=20, batch_size=32, verbose=True):
                         editdist = zss.simple_distance(original_trees[i], decoded_trees[i], get_label=Node.get_symbol, label_dist=symbol_distance)
                         if i == 0:
                             print()
-                            print(f"O: {original_trees[i]}")
-                            print(f"P: {decoded_trees[i]}")
+                            print(f"O: {original_trees[i].to_string(datasetstr)}")
+                            print(f"P: {decoded_trees[i].to_string(datasetstr)}")
                             print("Tree edit distance: " + str(int(editdist)))
                         editdist_sum += int(editdist)
                         tree_count += 1
 
 
 if __name__ == '__main__':
-    parser = ArgumentParser(prog='Model training', description='Train a HVAE model')
+    parser = ArgumentParser(prog='Model training', description='Train an nHVAE model')
     parser.add_argument("-config", default="../configs/config.json")
     args = parser.parse_args()
 
     config = load_config_file(args.config)
-    expr_config = config["expression_definition"]
-    es_config = config["expression_set_generation"]
+    data_config = config["data_definition"]
+    ds_config = config["data_set_generation"]
     training_config = config["training"]
+    datasetstr = config["dataset"]
 
     if training_config["seed"] is not None:
         np.random.seed(training_config["seed"])
         torch.manual_seed(training_config["seed"])
 
-    sy_lib = generate_symbol_library(expr_config["num_variables"], expr_config["symbols"], expr_config["has_constants"])
+    symbols = data_config["expr_symbols"] if datasetstr == "expr" else data_config["neuro_symbols"]
+    sy_lib = generate_symbol_library(data_config["num_variables"], symbols, datasetstr, data_config["has_constants"])
 
     nHVAE.add_symbols(sy_lib)
 
-    trees = read_expressions_json(es_config["expression_set_path"])
+    trees = read_trees_json(ds_config["data_set_path"])
 
     max_arity = max([t.max_branching_factor() for t in trees])
-    model = nHVAE(len(sy_lib), training_config["latent_size"], max_arity)
+    model = nHVAE(len(sy_lib), training_config["latent_size"], max_arity, dataset=datasetstr)
 
     train_hvae(model, trees, training_config["epochs"], training_config["batch_size"], training_config["verbose"])
 
