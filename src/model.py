@@ -9,14 +9,14 @@ from tree import Node, BatchedNode
 class nHVAE(nn.Module):
     _symbols = None
 
-    def __init__(self, input_size, output_size, max_arity, hidden_size=None):
+    def __init__(self, input_size, output_size, max_arity, hidden_size=None, dataset='expr'):
         super(nHVAE, self).__init__()
 
         if hidden_size is None:
             hidden_size = output_size
 
         self.encoder = Encoder(input_size, hidden_size, output_size, max_arity)
-        self.decoder = Decoder(output_size, hidden_size, input_size, max_arity)
+        self.decoder = Decoder(output_size, hidden_size, input_size, max_arity, dataset)
 
     def forward(self, tree):
         mu, logvar = self.encoder(tree)
@@ -91,11 +91,12 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, max_arity):
+    def __init__(self, input_size, hidden_size, output_size, max_arity, dataset):
         super(Decoder, self).__init__()
         self.hidden_size = hidden_size
         self.output_size = output_size
         self.max_arity = max_arity
+        self.dataset = dataset
         self.h2o = nn.Linear(hidden_size, output_size)
         self.gru = GRU221(input_size=output_size, hidden_size=hidden_size)
 
@@ -162,6 +163,7 @@ class Decoder(nn.Module):
         children = []
         hasNextChild = True
         for i in range(child_mask.size(0)):
+            if not self.dataset == 'neuro' and torch.any(child_mask[i]): break
             if not hasNextChild: break
             if torch.any(child_mask[i]) and first:
                 x, h = torch.zeros(prediction.size()), torch.zeros(hidden_a.size())
@@ -175,7 +177,8 @@ class Decoder(nn.Module):
                 hasNextChild = True if any([symbol in symbols for symbol in symbols_multiarity]) else False
                 if hasNextChild:
                     hasNextChild = torch.sum(s_f).item() > 0
-                    test = torch.Tensor([1 if sym in symbols_multiarity else 0 for sym in symbols])
+                    test = torch.Tensor([1 if sym in symbols_multiarity else 0 for sym in symbols]) if self.dataset == 'expr' else (
+                        torch.Tensor([1 if sym in symbols_multiarity and [dict for dict in symbol_dict if dict["key"] == sym][0]["max_arity"] > i+1 else 0 for sym in symbols]))
                     child_mask[i+1] = s_f * test
             first = False
 
@@ -202,8 +205,10 @@ class Decoder(nn.Module):
                 symbol = next(d for d in symbol_dict if d["key"] == s)
                 if "arity" in symbol and symbol["arity"] > max_arity:
                     max_arity = symbol["arity"]
-                elif "arity" not in symbol:
+                elif self.dataset == 'expr' and "arity" not in symbol:
                     max_arity = self.max_arity
+                elif self.dataset == 'neuro' and "arity" not in symbol and symbol["max_arity"] > max_arity:
+                    max_arity = symbol["max_arity"]
 
         child_mask = torch.empty([max_arity, mask.size(0)])
         for i in range(max_arity):
