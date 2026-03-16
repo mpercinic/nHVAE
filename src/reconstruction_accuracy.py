@@ -1,7 +1,6 @@
 import random
 from argparse import ArgumentParser
 
-import numpy as np
 import torch
 from sklearn.model_selection import KFold
 import zss
@@ -17,8 +16,8 @@ from validity_checking import *
 def symbol_distance(s1, s2):
     return int(s1 != s2)
 
-def one_fold(model, train, test, epochs, batch_size, verbose, symbols, max_arity, grammar, invalid):
-    train_hvae(model, train, epochs, batch_size, verbose)
+def one_fold(model, train, test, epochs, batch_size, verbose, symbols, max_arity, grammar, invalid, dataset):
+    train_hvae(model, train, dataset, epochs, batch_size, verbose)
 
     total_distance = []
     counter = 0
@@ -42,7 +41,7 @@ def one_fold(model, train, test, epochs, batch_size, verbose, symbols, max_arity
     print(counter)
     return total_distance, invalid
 
-def one_experiment(name, trees, input_dim, latent_dim, epochs, batch_size, verbose, seed, max_arity, symbols, grammar,
+def one_experiment(name, trees, input_dim, latent_dim, epochs, batch_size, verbose, seed, max_arity, symbols, grammar, dataset,
                    smaller_dataset=False, examples=2000, n_splits=5, results_path=None):
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=seed)
     distances = []
@@ -60,7 +59,7 @@ def one_experiment(name, trees, input_dim, latent_dim, epochs, batch_size, verbo
 
         test = [trees[i] for i in test_idx]
         model = nHVAE(input_dim, latent_dim, max_arity, dataset=dataset)
-        d, inv = one_fold(model, train, test, epochs, batch_size, verbose, symbols, max_arity, grammar, 0)
+        d, inv = one_fold(model, train, test, epochs, batch_size, verbose, symbols, max_arity, grammar, 0, dataset)
         distances.append(d)
         n_invalid += inv
         print(f"Mean: {np.mean(distances[-1])}, Var: {np.var(distances[-1])}")
@@ -113,7 +112,7 @@ if __name__ == '__main__':
 
     one_experiment(ds_config["data_set_path"], trees, len(sy_lib), training_config["latent_size"],
                    training_config["epochs"], training_config["batch_size"], training_config["verbose"],
-                   training_config["seed"], max_arity, so, grammar, reconstruction_config["smaller_dataset"],
+                   training_config["seed"], max_arity, so, grammar, dataset, reconstruction_config["smaller_dataset"],
                    reconstruction_config["num_trees"], reconstruction_config["n_folds"],
                    reconstruction_config["results_path"])
 

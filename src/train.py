@@ -47,7 +47,7 @@ def symbol_distance(s1, s2):
     return int(s1 != s2)
 
 
-def train_hvae(model, trees, epochs=20, batch_size=32, verbose=True):
+def train_hvae(model, trees, datasetstr, epochs=20, batch_size=32, verbose=True):
     dataset = TreeDataset(trees)
 
     optimizer = torch.optim.Adam(model.parameters())
@@ -128,7 +128,7 @@ if __name__ == '__main__':
     max_arity = max([t.max_branching_factor() for t in trees])
     model = nHVAE(len(sy_lib), training_config["latent_size"], max_arity, dataset=datasetstr)
 
-    train_hvae(model, trees, training_config["epochs"], training_config["batch_size"], training_config["verbose"])
+    train_hvae(model, trees, datasetstr, training_config["epochs"], training_config["batch_size"], training_config["verbose"])
 
     if training_config["param_path"] != "":
         torch.save(model, training_config["param_path"])
