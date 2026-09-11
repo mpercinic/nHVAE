@@ -88,7 +88,7 @@ def train_hvae(model, trees, datasetstr, epochs=20, batch_size=32, verbose=True)
                 lmbda = logistic_function(iter_counter, total_iters)
                 iter_counter += 1
 
-                if verbose and i == midpoint:
+                '''if verbose and i == midpoint:
                     original_trees = batch.to_expr_list()
                     z = model.encode(batch)[0]
                     decoded_trees = model.decode(z)
@@ -100,7 +100,7 @@ def train_hvae(model, trees, datasetstr, epochs=20, batch_size=32, verbose=True)
                             print(f"P: {decoded_trees[i].to_string(datasetstr)}")
                             print("Tree edit distance: " + str(int(editdist)))
                         editdist_sum += int(editdist)
-                        tree_count += 1
+                        tree_count += 1'''
 
 
 if __name__ == '__main__':

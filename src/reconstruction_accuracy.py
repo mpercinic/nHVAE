@@ -27,8 +27,8 @@ def one_fold(model, train, test, epochs, batch_size, verbose, symbols, max_arity
         pts = model.decode(latent)
         for j in range(len(pts)):
             if dataset == 'expr':
-                expr_tree = tokens_to_tree(test[i * batch_size + j].to_list(dataset), symbols, max_arity)
-                decoded_tree = tokens_to_tree(pts[j].to_list(dataset), symbols, max_arity)
+                expr_tree = tokens_to_tree(test[i * batch_size + j].to_list(dataset), symbols, max_arity, dataset)
+                decoded_tree = tokens_to_tree(pts[j].to_list(dataset), symbols, max_arity, dataset)
                 if pts[j].to_pexpr() != decoded_tree.to_pexpr() and test[i * batch_size + j].to_pexpr() == expr_tree.to_pexpr():
                     counter += 1
                 total_distance.append(zss.simple_distance(expr_tree, decoded_tree, get_label=Node.get_symbol, label_dist=symbol_distance))

@@ -163,7 +163,7 @@ class Decoder(nn.Module):
         children = []
         hasNextChild = True
         for i in range(child_mask.size(0)):
-            if not self.dataset == 'neuro' and torch.any(child_mask[i]): break
+            #if not self.dataset == 'neuro' and torch.any(child_mask[i]): break
             if not hasNextChild: break
             if torch.any(child_mask[i]) and first:
                 x, h = torch.zeros(prediction.size()), torch.zeros(hidden_a.size())

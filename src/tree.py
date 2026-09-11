@@ -146,7 +146,7 @@ class Node:
             if stype == SymType.Var.value or stype == SymType.Const.value:
                 return [self.symbol]
             elif stype == SymType.Fun.value and len(self.children) == 1:
-                expression = self.children[0].to_list()
+                expression = self.children[0].to_list(dataset)
                 if Node.symbol_precedence(self.symbol) > 0:
                     return [self.symbol, "("] + expression + [")"]
                 else:
@@ -158,7 +158,7 @@ class Node:
                 first = True
                 for t in self.children:
                     expression += [self.symbol[0]] if not first else []
-                    subexpression = t.to_list()
+                    subexpression = t.to_list(dataset)
                     if -1 < Node.symbol_precedence(t.symbol) < Node.symbol_precedence(self.symbol) \
                             or (not first and Node.has_precedence(self.symbol, t.symbol)):
                         subexpression = ["("] + subexpression + [")"]
@@ -170,7 +170,7 @@ class Node:
         elif dataset == 'neuro':
             res = [self.symbol]
             for t in self.children:
-                res += t.to_list()
+                res += t.to_list(dataset)
             return res
         else:
             raise Exception("Invalid data set. Please provide a valid data set in the config file.")

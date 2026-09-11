@@ -133,7 +133,7 @@ def is_float(element: any) -> bool:
         return False
 
 
-def tokens_to_tree(tokens, symbols, max_arity):
+def tokens_to_tree(tokens, symbols, max_arity, dataset):
     start_expr = "".join(tokens)
     num_tokens = len([t for t in tokens if t != "(" and t != ")"])
     tokens = ["("] + tokens + [")"]
@@ -201,20 +201,30 @@ def generate_expressions(grammar, number_of_all_expressions, symbols, max_arity,
     expression_set = set()
     expression_trees = []
 
+    bins = [(0, 15), (16, 20), (21, 25), (26, 30), (31, 35)]
+    labels = ['0-15', '16-20', '21-25', '26-30', '31-35']
+    counts = {label: 0 for label in labels}
+
     while len(expression_trees) < number_of_all_expressions:
         if len(expression_trees) % 500 == 0:
             print(f"Unique expressions generated so far: {len(expression_trees)}")
         expr = generator.generate_one()[0]
 
-        try:
-            expr_tree = tokens_to_tree(expr, symbols, max_arity)
-            expr_str = "".join(expr_tree.to_list(dataset))
-            if expr_str in expression_set:
-                continue
-            if len([s for s in expr_tree.to_list(dataset) if s not in ["(", ")"]]) > max_length:
-                continue
-        except:
+        expr_tree = tokens_to_tree(expr, symbols, max_arity)
+        expr_str = "".join(expr_tree.to_list(dataset))
+        if expr_str in expression_set:
             continue
+        if len([s for s in expr_tree.to_list(dataset) if s not in ["(", ")"]]) > max_length:
+            continue
+
+        node_count = len(expr_tree)
+        for (low, high), label in zip(bins, labels):
+            if low <= node_count <= high: break
+
+        if label == '0-15' and counts[label] == 40000/5*2: continue
+        if label != '0-15' and counts[label] == 40000/5: continue
+        counts[label] += 1
+
         expression_trees.append(expr_tree)
         expression_set.add(expr_str)
     return expression_trees

@@ -19,10 +19,10 @@
     // Number of generated trees
     "num_trees": 40000,
     // Max no. of nodes in the generated trees
-    "max_length": 25,
+    "max_length": 35,
     // Path where the generated data set will be saved. If empty string, the data set won't be saved
     // This path is also used in training and reconstruction script as input into the model
-    "data_set_path": "../data/40k_expr.json"
+    "data_set_path": "../data/40k_expr_35.json"
   },
   "training": {
     // Number of epochs the model trains for
