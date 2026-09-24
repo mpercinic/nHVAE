@@ -99,6 +99,20 @@ class Node:
             return 0
         return max([len(self.children)] + [c.max_branching_factor() for c in self.children])
 
+    def height(self):
+        height_max = 0
+        for t in self.children:
+            if t.height() > height_max:
+                height_max = t.height()
+        return 1 + height_max
+
+    def n_nonleaf_nodes(self):
+        if len(self.children) == 0: return 0
+        s = 0
+        for t in self.children:
+            s += t.n_nonleaf_nodes()
+        return s + 1
+
     def to_string(self, dataset):
         return "".join(self.to_list(dataset))
 

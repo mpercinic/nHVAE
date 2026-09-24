@@ -16,7 +16,7 @@ from validity_checking import *
 def symbol_distance(s1, s2):
     return int(s1 != s2)
 
-def one_fold(model, train, test, epochs, batch_size, verbose, symbols, max_arity, grammar, invalid, dataset):
+def one_fold(model, train, test, epochs, batch_size, verbose, symbols, max_arity, grammar, invalid, dataset, f):
     train_hvae(model, train, dataset, epochs, batch_size, verbose)
 
     total_distance = []
@@ -38,40 +38,47 @@ def one_fold(model, train, test, epochs, batch_size, verbose, symbols, max_arity
                     continue
                 total_distance.append(zss.simple_distance(test[i * batch_size + j], pts[j], get_label=Node.get_symbol, label_dist=symbol_distance))
     print(len(total_distance))
+    f.write(str(len(total_distance)) + '\n')
     print(counter)
+    f.write(str(counter) + '\n')
     return total_distance, invalid
 
 def one_experiment(name, trees, input_dim, latent_dim, epochs, batch_size, verbose, seed, max_arity, symbols, grammar, dataset,
                    smaller_dataset=False, examples=2000, n_splits=5, results_path=None):
-    kf = KFold(n_splits=n_splits, shuffle=True, random_state=seed)
-    distances = []
-    n_invalid = 0
-    for i, (train_idx, test_idx) in enumerate(kf.split(trees)):
-        train_idx = np.random.permutation(train_idx)
-        print(f"Fold {i + 1}")
-        if smaller_dataset:
-            np.random.seed(seed + i)
-            torch.manual_seed(seed + i)
-            inds = train_idx[:examples]
-            train = [trees[i] for i in inds]
-        else:
-            train = [trees[i] for i in train_idx]
+    with open("../results/results.txt", "a") as f:
+        kf = KFold(n_splits=n_splits, shuffle=True, random_state=seed)
+        distances = []
+        n_invalid = 0
+        for i, (train_idx, test_idx) in enumerate(kf.split(trees)):
+            train_idx = np.random.permutation(train_idx)
+            print(f"Fold {i + 1}")
+            f.write(f"Fold {i + 1}\n")
+            if smaller_dataset:
+                np.random.seed(seed + i)
+                torch.manual_seed(seed + i)
+                inds = train_idx[:examples]
+                train = [trees[i] for i in inds]
+            else:
+                train = [trees[i] for i in train_idx]
 
-        test = [trees[i] for i in test_idx]
-        model = nHVAE(input_dim, latent_dim, max_arity, dataset=dataset)
-        d, inv = one_fold(model, train, test, epochs, batch_size, verbose, symbols, max_arity, grammar, 0, dataset)
-        distances.append(d)
-        n_invalid += inv
-        print(f"Mean: {np.mean(distances[-1])}, Var: {np.var(distances[-1])}")
-        print("Invalid: " + str(inv) + '/' + str(len(test_idx)))
-        print()
-    fm = [np.mean(d) for d in distances]
-    print(f"Mean: {np.mean(fm)}, Std dev: {np.std(fm)}, All: {', '.join([str(f) for f in fm])}")
-    print("Invalid: " + str(n_invalid))
-    if results_path is not None:
-        with open(results_path, "a") as file:
-            file.write(f"{name}\t Mean: {np.mean(fm)}, Std dev: {np.std(fm)}, All: {', '.join([str(f) for f in fm])}\n")
-    return fm
+            test = [trees[i] for i in test_idx]
+            model = nHVAE(input_dim, latent_dim, max_arity, dataset=dataset)
+            d, inv = one_fold(model, train, test, epochs, batch_size, verbose, symbols, max_arity, grammar, 0, dataset, f)
+            distances.append(d)
+            n_invalid += inv
+            print(f"Mean: {np.mean(distances[-1])}, Var: {np.var(distances[-1])}")
+            f.write(f"Mean: {np.mean(distances[-1])}, Var: {np.var(distances[-1])}\n")
+            print("Invalid: " + str(inv) + '/' + str(len(test_idx)))
+            f.write("Invalid: " + str(inv) + '/' + str(len(test_idx)) + '\n')
+            print()
+            f.write('\n')
+        fm = [np.mean(d) for d in distances]
+        print(f"Mean: {np.mean(fm)}, Std dev: {np.std(fm)}, All: {', '.join([str(f) for f in fm])}")
+        print("Invalid: " + str(n_invalid))
+        if results_path is not None:
+            with open(results_path, "a") as file:
+                file.write(f"{name}\t Mean: {np.mean(fm)}, Std dev: {np.std(fm)}, All: {', '.join([str(f) for f in fm])}\n")
+        return fm
 
 if __name__ == '__main__':
     parser = ArgumentParser(prog='Tree reconstruction', description='Evaluate the reconstruction ability of nHVAE')

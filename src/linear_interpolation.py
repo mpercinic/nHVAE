@@ -41,8 +41,14 @@ if __name__ == '__main__':
     model = torch.load(training_config["param_path"])
 
     # Expressions we want to interpolate between
-    exprA = "log ( A ) / ( A + A )"
-    exprB = "sqrt ( C * sin ( A ) ) * A * A"
+    #exprA = "log ( X_0 ) / ( X_0 + X_0 )"
+    #exprB = "sqrt ( C * sin ( X_0 ) ) * X_0 * X_0"
+
+    exprA = "log ( C * C / X_0 ) - X_0 - X_0 ^2"
+    exprB = "C + X_0 * C - X_0 * X_0"
+
+    #exprA = "A * A / C * cos ( C * A )"
+    #exprB = "A - ( C + A + C ) / C - A"
 
     # Number of steps in the interpolation (inclusive with expressions A and B)
     steps = 5

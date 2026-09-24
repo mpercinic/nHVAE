@@ -196,34 +196,34 @@ def tokens_to_tree(tokens, symbols, max_arity, dataset):
     return out_stack[-1]
 
 
-def generate_expressions(grammar, number_of_all_expressions, symbols, max_arity, max_length):
+def generate_expressions(grammar, number_of_all_expressions, symbols, max_arity, max_length, dataset):
     generator = GeneratorGrammar(grammar)
     expression_set = set()
     expression_trees = []
 
-    bins = [(0, 15), (16, 20), (21, 25), (26, 30), (31, 35)]
+    """bins = [(0, 15), (16, 20), (21, 25), (26, 30), (31, 35)]
     labels = ['0-15', '16-20', '21-25', '26-30', '31-35']
-    counts = {label: 0 for label in labels}
+    counts = {label: 0 for label in labels}"""
 
     while len(expression_trees) < number_of_all_expressions:
         if len(expression_trees) % 500 == 0:
             print(f"Unique expressions generated so far: {len(expression_trees)}")
         expr = generator.generate_one()[0]
 
-        expr_tree = tokens_to_tree(expr, symbols, max_arity)
+        expr_tree = tokens_to_tree(expr, symbols, max_arity, dataset)
         expr_str = "".join(expr_tree.to_list(dataset))
-        if expr_str in expression_set:
-            continue
+        '''if expr_str in expression_set:
+            continue'''
         if len([s for s in expr_tree.to_list(dataset) if s not in ["(", ")"]]) > max_length:
             continue
 
-        node_count = len(expr_tree)
+        '''node_count = len(expr_tree)
         for (low, high), label in zip(bins, labels):
             if low <= node_count <= high: break
 
         if label == '0-15' and counts[label] == 40000/5*2: continue
         if label != '0-15' and counts[label] == 40000/5: continue
-        counts[label] += 1
+        counts[label] += 1'''
 
         expression_trees.append(expr_tree)
         expression_set.add(expr_str)
@@ -247,20 +247,20 @@ def prods_to_tree(prods):
 
 def generate_parse_trees(grammar, number_of_all_expressions, max_length):
     generator = GeneratorGrammar(grammar)
-    parsetree_set = set()
+    #parsetree_set = set()
     parse_trees = []
 
     while len(parse_trees) < number_of_all_expressions:
         if len(parse_trees) % 500 == 0:
             print(f"Unique trees generated so far: {len(parse_trees)}")
         ptree = generator.generate_one()[3]
-        if ptree in parsetree_set: continue
+        #if ptree in parsetree_set: continue
 
         tree = prods_to_tree(ptree)
         if len(tree) > max_length: continue
 
         parse_trees.append(tree)
-        parsetree_set.add(ptree)
+        #parsetree_set.add(ptree)
 
     return parse_trees
 
@@ -289,7 +289,7 @@ if __name__ == '__main__':
     if grammar is None:
         grammar = generate_expr_grammar(sy_lib) if dataset == "expr" else generate_neuro_grammar()
 
-    trees = generate_expressions(grammar, ds_config["num_trees"], so, data_config["max_arity"], ds_config["max_length"]) \
+    trees = generate_expressions(grammar, ds_config["num_trees"], so, data_config["max_arity"], ds_config["max_length"], dataset) \
         if dataset == "expr" else generate_parse_trees(grammar, ds_config["num_trees"], ds_config["max_length"])
     print("Number of expressions generated: " + str(len(trees)))
 
