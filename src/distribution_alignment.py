@@ -7,16 +7,18 @@ from scipy.stats import wasserstein_distance
 from utils import read_trees_json, load_config_file
 from symbol_library import generate_symbol_library
 from tree import Node
-from expression_set_generation import tokens_to_tree
+from expression_set_generation import tokens_to_tree, generate_expr_grammar, generate_neuro_grammar
 from model import nHVAE
+from validity_checking import *
 
-def decode_generated_set(model, dataset_size, path):
+def decode_generated_set(model, dataset_size, path, dataset_name, grammar):
     dataset = [torch.normal(mean=torch.zeros(128), std=torch.ones(128)) for _ in range(dataset_size)]
     tree_dataset = []
     for i in range(int(dataset_size / 32)):
         z = torch.stack(dataset[i*32:(i+1)*32])
         decoded_trees = model.decode(z)
         for tree in decoded_trees:
+            if dataset_name == 'neuro' and not tree.verify(grammar): continue
             tree_dataset.append(tree)
 
     expr_dict = [tree.to_dict() for tree in tree_dataset]
@@ -48,12 +50,20 @@ if __name__ == '__main__':
     Node.add_symbols(sy_lib)
     so = {s["symbol"]: s for s in sy_lib} if datasetstr == "expr" else {s["key"]: s for s in sy_lib}
 
-    #model = torch.load(training_config["param_path"])
-    #decode_generated_set(model, ds_config["num_trees"], path)
+    grammar = generate_expr_grammar(sy_lib) if datasetstr == "expr" else generate_neuro_grammar()
+    if datasetstr == "neuro":
+        constraints = {
+            "Node_post": lambda grammar, rule, constraints: constraint_Node(grammar, rule, constraints),
+            "NumIncomingConns_pre": lambda grammar, constraints: constraint_NumIncomingConns(grammar, constraints),
+            "ConnFuncMode_pre": lambda grammar, constraints: constraint_ConnFuncMode(grammar, constraints)
+        }
+        grammar = Grammar(grammar, "Node", constraints)
+
+    model = torch.load(training_config["param_path"])
+    decode_generated_set(model, ds_config["num_trees"], path, datasetstr, grammar)
 
     trees = read_trees_json(path)
     trees_decoded = read_trees_json(path.split(".json")[0] + '_decoded.json')
-    trees_decoded = read_trees_json('../data/40k_neuro_repeated_decoded_cvae.json')
     if datasetstr == "expr":
         trees_decoded = [tokens_to_tree(t.to_list(datasetstr), so, 5 ,datasetstr) for t in trees_decoded]
     lens = [len(t) for t in trees]
